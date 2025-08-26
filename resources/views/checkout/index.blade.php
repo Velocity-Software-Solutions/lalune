@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="max-w-4xl px-4 py-10 mx-auto sm:px-6 lg:px-8 min-h-screen bg-cream"
+<div class="max-w-4xl px-4 py-10 mx-auto sm:px-6 lg:px-8 min-h-screen bg-white"
      x-data="checkoutState({
         // Server data
         countries: {{ Js::from($countries) }},                // { country: [city, ...] }
@@ -16,11 +16,11 @@
      })">
 
     {{-- Cart Items --}}
-    <div class="p-6 mb-6 bg-white rounded-lg shadow border border-cream/60">
-        <h2 class="mb-4 text-xl font-semibold text-primary">{{ __('checkout.your_cart') }}</h2>
+    <div class="p-6 mb-6 bg-white rounded-lg shadow border border-white/60">
+        <h2 class="mb-4 text-xl font-semibold text-black">{{ __('checkout.your_cart') }}</h2>
 
         @if (count($cart) > 0)
-            <ul class="divide-y divide-cream/60">
+            <ul class="divide-y divide-white/60">
                 @foreach ($cart as $id => $item)
                     <li class="flex items-start justify-between py-3">
                         <div class="pr-4">
@@ -128,7 +128,7 @@
         </div>
 
         {{-- Order Summary --}}
-        <div class="p-4 mt-4 bg-cream border border-primary/10 rounded">
+        <div class="p-4 mt-4 bg-white border border-primary/10 rounded">
             <p class="mb-2 text-charcoal">
                 {{ __('checkout.subtotal') }}: {{ __('product.currency_aed') }} {{ number_format($subtotal, 2) }}
             </p>
@@ -144,7 +144,7 @@
                 <span x-text="currency + ' ' + shippingCost.toFixed(2)"></span>
             </p>
 
-            <p class="font-bold text-gold tracking-wide">
+            <p class="font-bold text-black tracking-wide">
                 {{ __('checkout.total') }}:
                 <span x-text="currency + ' ' + (baseTotal + shippingCost).toFixed(2)"></span>
             </p>
@@ -154,8 +154,8 @@
 
         <button type="submit"
                 :disabled="!selectedShippingId"
-                class="w-full py-3 text-lg font-semibold text-white bg-primary rounded
-                       hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-gold/40
+                class="w-full py-3 text-lg font-semibold text-white bg-gray-700 rounded
+                       hover:bg-gray-700/90 focus:outline-none focus:ring-2 focus:ring-black/40
                        disabled:opacity-50 disabled:cursor-not-allowed">
             {{ __('checkout.confirm_pay') }}
         </button>

@@ -16,11 +16,18 @@ class DatabaseSeeder extends Seeder
     {
         // User::factory(10)->create();
 
-        User::factory()->create([
-            'name' => 'Admin',
-            'email' => 'mosstafagenedy@gmail.com',
-            'password' => Hash::make('mostafa123'),
-            'type' => 1,
+        
+        // User::factory()->create([
+        //     'name' => 'Admin',
+        //     'email' => 'mosstafagenedy@gmail.com',
+        //     'password' => Hash::make('mostafa123'),
+        //     'type' => 1,
+        // ]);
+
+        $this->call([
+
+            CategoriesSeeder::class,
+            ProductsSeeder::class,
         ]);
     }
 }

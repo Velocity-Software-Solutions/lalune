@@ -34,7 +34,7 @@
 
 .nav-item {
   margin: 0px;
-  color: #3f001f;
+  color: #000;
   border-bottom-width: 2px;
   border-color: transparent;
   transition: all 0.5s linear;
@@ -44,8 +44,8 @@
 }
 
 .nav-item.active {
-  color: #3f001f;
-  border-bottom: 2px solid #424242;
+  color: #000;
+  border-bottom: 2px solid #2222;
 
 }
 
@@ -58,7 +58,7 @@
   transform-origin: center;
   width: 100%;
   height: 2px;
-  background-color: #3f001f;
+  background-color: #000;
   transition: transform 0.3s ease;
 }
 
@@ -69,7 +69,7 @@
 
 .nav-item2 {
   margin: 20px;
-  color: #3f001f;
+  color: #000;
   border-bottom-width: 2px;
   border-color: transparent;
   transition: all 0.5s linear;
@@ -77,13 +77,13 @@
 
 .nav-item2:hover {
   margin: 2px;
-  color: #3f001f;
-  border-bottom: 2px solid #3f001f;
+  color: #000;
+  border-bottom: 2px solid #000;
 }
 
 .nav-item3 {
   margin: 10px;
-  color: #3f001f;
+  color: #000;
   border-bottom-width: 2px;
   border-color: transparent;
   transition: all 0.5s linear;
@@ -91,13 +91,13 @@
 
 .nav-item3:hover {
   margin: 10px;
-  color: #3f001f;
+  color: #000;
 }
 
 .product-box {
   position: relative;
-  border: 1px solid #d4c09e;
-  background: #f8f1e7;
+  border: 1px solid #c7c7c7;
+  background: #fff;
 }
 
 /* Top-left corner */
@@ -108,9 +108,9 @@
   left: -8px;
   width: 16px;
   height: 16px;
-  border-top: 2px solid #d4af37;
+  border-top: 2px solid #222;
   /* gold */
-  border-left: 2px solid #d4af37;
+  border-left: 2px solid #222;
   border-radius: 2px;
 }
 
@@ -122,8 +122,8 @@
   right: -8px;
   width: 16px;
   height: 16px;
-  border-bottom: 2px solid #d4af37;
-  border-right: 2px solid #d4af37;
+  border-bottom: 2px solid #222;
+  border-right: 2px solid #222;
   border-radius: 2px;
 }
 

@@ -3,15 +3,15 @@
 @section('content')
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
-    <div x-data="{ showModal: false, modalImage: '' }" class="min-h-screen py-12 bg-cream">
+    <div x-data="{ showModal: false, modalImage: '' }" class="min-h-screen py-12 bg-gray-50">
         <div class="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8 fade-up">
-            <h2 class="mb-8 montaga-regular text-4xl sm:text-5xl font-bold text-primary">
+            <h2 class="mb-8 montaga-regular text-4xl sm:text-5xl font-bold text-black">
                 {{ __('shop.featured_products') }}
             </h2>
 
             @foreach ($products as $category => $groupedProducts)
                 {{-- If you localize categories, replace $category with a localized value (see note below) --}}
-                <h3 class="mt-10 mb-6 text-3xl montaga-semibold text-primary border-solid border-b border-cream/40 pb-2">
+                <h3 class="mt-10 mb-6 text-3xl montaga-semibold text-black border-solid border-b border-gray-50/40 pb-2">
                     {{ $category }}
                 </h3>
 
@@ -34,7 +34,7 @@
                                         <template x-for="(img, index) in {{ $product->images->take(3)->toJson() }}"
                                             :key="index">
                                             <button @click="current = index"
-                                                :class="{ 'bg-primary': current === index, 'bg-gray-300': current !== index }"
+                                                :class="{ 'bg-black': current === index, 'bg-gray-300': current !== index }"
                                                 class="w-3 h-3 rounded-full"></button>
                                         </template>
                                     </div>
@@ -48,11 +48,11 @@
                                     {{ Str::limit( app()->getLocale() === 'ar' && $product->description_ar ? $product->description_ar : $product->description, 80) }}
                                 </p>
                                 <div class="flex items-center justify-between mt-2">
-                                    <span class="text-xl font-bold text-gold">
+                                    <span class="text-xl font-bold text-black">
                                         {{ __('shop.currency_aed') }} {{ number_format($product->price, 2) }}
                                     </span>
                                     <a href="{{ route('products.show', $product->id) }}"
-                                        class="inline-block px-3 py-1 text-white transition bg-primary hover:bg-primary/90 focus:ring-2 focus:ring-gold/50 rounded">
+                                        class="inline-block px-3 py-1 text-white transition bg-black hover:bg-black/90 focus:ring-2 focus:ring-gold/50 rounded">
                                         {{ __('shop.view') }}
                                     </a>
                                 </div>

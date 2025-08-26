@@ -10,16 +10,16 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montaga&display=swap" rel="stylesheet">
-    <link rel="icon" type="image/x-icon" href="{{ asset('images/logo.jpg') }}">
+    <link rel="icon" type="image/x-icon" href="{{ asset('images/logo.jpeg') }}">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 
-<body class="text-gray-900 bg-[#f8f1e7]">
+<body class="text-gray-900 bg-gray-50">
     <header class="top-0 z-50 shadow">
         <div class="flex items-center justify-between px-[10%] py-4 mx-auto max-w-7xl">
             <div class="flex justify-center items-center gap-8">
                 <a href="/" class="text-2xl font-bold text-bg-700 bg-\[#f8f1e7]">
-                    <img src="{{ asset('images/logo.jpg') }}" alt="{{ __('messages.logo_alt') }}"
+                    <img src="{{ asset('images/logo.jpeg') }}" alt="{{ __('messages.logo_alt') }}"
                         class="rounded-full w-[70px] h-[70px] mb-4 object-bottom">
 
                 </a>
@@ -34,12 +34,6 @@
                     style="vertical-align: sub;">
                     <span class="text-2xl material-icons">shopping_cart</span>
                 </a>
-                <form action="{{ route('lang.switch', app()->getLocale() === 'ar' ? 'en' : 'ar') }}" method="GET"
-                    class="inline">
-                    <button type="submit" class="nav-item hover:text-gray-800">
-                        {{ app()->getLocale() === 'ar' ? 'EN' : 'AR' }}
-                    </button>
-                </form>
 
                 @auth
                     <a href="{{ route('dashboard') }}"
@@ -50,10 +44,6 @@
                             class="nav-item hover:text-gray-800">{{ __('messages.nav_logout') }}</button>
                     </form>
                 @else
-                    <a href="{{ route('login') }}" class="nav-item hover:text-gray-800">
-                        <span class="text-2xl material-icons">person</span>
-
-                    </a>
                 @endauth
             </nav>
         </div>
@@ -63,7 +53,7 @@
         @yield('content')
     </main>
 
-    <footer class="py-6 mt-10 bg-[#f8f1e7] border-t">
+    <footer class="py-6 mt-10 bg-gray-50 border-t">
         <div class="mx-auto text-center text-gray-500 max-w-7xl">
             &copy; {{ date('Y') }} {{ config('app.name', 'Al Khinjar Al Dhahbi') }}.
             {{ __('messages.footer_rights') }}
