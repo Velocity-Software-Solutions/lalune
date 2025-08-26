@@ -127,6 +127,27 @@
   border-radius: 2px;
 }
 
+.cb-cursor:before {
+  content: '';
+  width: 40px;
+  /* adjust size */
+  height: 40px;
+  border-radius: 50%;
+  /* makes it a circle */
+  background: radial-gradient(circle at 30% 30%,
+      #f5f5f5 0%,
+      /* bright moon center */
+      #dcdcdc 40%,
+      /* softer grey mid */
+      #7c7c7c 70%,
+      /* darker grey edge */
+      #000 100%);
+  /* space shadow */
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.6),
+    0 0 20px rgba(200, 200, 200, 0.4);
+  /* glowing halo */
+}
+
 .fade-up-nav {
   opacity: 0;
   transform: translate(-50%, 10%);

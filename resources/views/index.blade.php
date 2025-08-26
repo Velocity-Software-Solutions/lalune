@@ -5,7 +5,7 @@
 
     <div x-data="{ showModal: false, modalImage: '' }" class="min-h-screen py-12 bg-gray-50">
         <div class="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8 fade-up">
-            <h2 class="mb-8 montaga-regular text-4xl sm:text-5xl font-bold text-black">
+            <h2 class="mb-8 montserrat-semibold text-4xl sm:text-5xl font-bold text-black">
                 {{ __('shop.featured_products') }}
             </h2>
 

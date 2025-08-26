@@ -11,7 +11,9 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montaga&display=swap" rel="stylesheet">
     <link rel="icon" type="image/x-icon" href="{{ asset('images/logo.jpeg') }}">
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    @vite(['resources/css/app.css','resources/css/mousecursor.css', 'resources/js/app.js', 'resources/js/magiccursor.js'])
 </head>
 
 <body class="text-gray-900 bg-gray-50">
@@ -30,8 +32,7 @@
                 <a href="/" class="nav-item hover:text-gray-800"><span
                         class="text-2xl material-icons">home</span></a>
 
-                <a href="{{ route('cart.index') }}" class="nav-item hover:text-gray-800"
-                    style="vertical-align: sub;">
+                <a href="{{ route('cart.index') }}" class="nav-item hover:text-gray-800" style="vertical-align: sub;">
                     <span class="text-2xl material-icons">shopping_cart</span>
                 </a>
 
