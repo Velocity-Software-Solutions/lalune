@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
 @section('content')
-    <div class="min-h-screen py-3">
+    <div class="min-h-screen py-3" x-data="{ showModal: false, modalImage: '' }">
         <div class="max-w-5xl px-4 mx-auto sm:px-6 lg:px-8">
             <div class="grid grid-cols-1 gap-8 md:grid-cols-2 place-items-center">
                 {{-- Carousel --}}
@@ -86,7 +86,9 @@
                             <div
                                 class="relative flex justify-center items-center w-full h-[300px] overflow-hidden rounded-t-md p-1">
                                 <img class="h-full object-contain cursor-zoom-in rounded-md" alt="{{ $product->name }}"
-                                    src="{{ asset('storage/' . $product->images->first()->image_path) }}">
+                                    src="{{ asset('storage/' . $product->images->first()->image_path) }}"
+                                    @click="showModal = true; modalImage = '{{ asset('storage/' . $product->images->first()->image_path) }}'">
+
                             </div>
                         @endif
 
@@ -108,6 +110,20 @@
                         </div>
                     </div>
                 @endforeach
+            </div>
+        </div>
+        <div x-show="showModal" x-transition x-cloak
+            class="fixed inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center p-4"
+            @click.away="showModal = false" @keydown.escape.window="showModal = false" role="dialog"
+            :aria-label="`{{ __('shop.image_preview') }}`">
+            <div class="relative max-w-full max-h-screen">
+                <button @click="showModal = false"
+                    class="absolute -top-4 -right-4 flex justify-center items-center bg-white text-black text-2xl w-8 h-8 rounded-full shadow hover:bg-gray-100 z-50"
+                    aria-label="{{ __('shop.close') }}">
+                    <span class="material-icons">close</span>
+                </button>
+                <img :src="modalImage" class="max-w-full max-h-[90vh] rounded shadow-xl"
+                    :alt="`{{ __('shop.image_preview') }}`">
             </div>
         </div>
     </div>
