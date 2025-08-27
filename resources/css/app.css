@@ -111,7 +111,7 @@
   border-top: 2px solid #222;
   /* gold */
   border-left: 2px solid #222;
-  border-radius: 2px;
+  border-radius: 10px;
 }
 
 /* Bottom-right corner */
@@ -124,7 +124,22 @@
   height: 16px;
   border-bottom: 2px solid #222;
   border-right: 2px solid #222;
-  border-radius: 2px;
+  border-radius: 10px;
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; }
 }
 
 .cb-cursor:before {

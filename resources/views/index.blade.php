@@ -15,10 +15,11 @@
                     {{ $category }}
                 </h3>
 
-                <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                <div
+                    class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 pb-9 border-b border-b-black/20 border-solid">
                     @foreach ($groupedProducts as $product)
                         <div
-                            class="product-box px-2 py-5 !transition rounded-sm !duration-500 fade-up">
+                            class="product-box px-2 py-5 !transition rounded-2xl !duration-500 shadow-md hover:shadow-2xl hover:-translate-y-4 hover:border-black/5 fade-up will-change: transform">
                             @if ($product->images->count())
                                 <div x-data="{ current: 0 }"
                                     class="relative flex justify-center items-center w-full h-[300px] overflow-hidden rounded-t-md p-2">
@@ -35,22 +36,53 @@
                                             :key="index">
                                             <button @click="current = index"
                                                 :class="{ 'bg-black': current === index, 'bg-gray-300': current !== index }"
-                                                class="w-3 h-3 rounded-full"></button>
+                                                class="btn-view w-3 h-3 rounded-full"></button>
                                         </template>
                                     </div>
                                 </div>
                             @endif
 
                             <div class="p-4">
-                                <h3 class="text-lg font-semibold text-charcoal">
-                                    {{ app()->getLocale() === 'ar' && $product->name_ar ? $product->name_ar : $product->name }}</h3>
-                                <p class="mt-1 text-charcoal/90">
-                                    {{ Str::limit( app()->getLocale() === 'ar' && $product->description_ar ? $product->description_ar : $product->description, 80) }}
+                                <h3 class="text-lg montserrat-bold text-charcoal tracking-wide">
+                                    {{ app()->getLocale() === 'ar' && $product->name_ar ? $product->name_ar : $product->name }}
+                                </h3>
+                                <p class="mt-1 text-charcoal/90 font-mono">
+                                    {{ Str::limit(app()->getLocale() === 'ar' && $product->description_ar ? $product->description_ar : $product->description, 80) }}
                                 </p>
                                 <div class="flex items-center justify-between mt-2">
-                                    <span class="text-xl font-bold text-black">
-                                        {{ __('shop.currency_aed') }} {{ number_format($product->price, 2) }}
-                                    </span>
+                                    @if ($product->discount_price)
+                                        <!-- Discounted Price -->
+                                        <div class="flex flex-col gap-3">
+                                            <span class="text-2xl font-semibold text-red-600">
+                                                CAD {{ number_format($product->discount_price, 2) }}
+                                            </span>
+                                            <div class="flex items-center space-x-2">
+                                                <!-- Original Price -->
+                                                <span class="text-lg text-gray-500 line-through">
+                                                    CAD {{ number_format($product->price, 2) }}
+                                                </span>
+
+                                                <!-- Discount Badge -->
+                                                @php
+                                                    $discountPercent = round(
+                                                        (($product->price - $product->discount_price) /
+                                                            $product->price) *
+                                                            100,
+                                                    );
+                                                @endphp
+                                                <span
+                                                    class="text-[10px] px-1.5 py-0.5 font-bold text-white bg-green-600 rounded-md">
+                                                    -{{ $discountPercent }}%
+                                                </span>
+                                            </div>
+                                        </div>
+                                    @else
+                                        <!-- Normal Price -->
+                                        <span class="text-2xl font-semibold text-black">
+                                            CAD {{ number_format($product->price, 2) }}
+                                        </span>
+                                    @endif
+
                                     <a href="{{ route('products.show', $product->id) }}"
                                         class="inline-block px-3 py-1 text-white transition bg-black hover:bg-black/90 focus:ring-2 focus:ring-gold/50 rounded">
                                         {{ __('shop.view') }}
