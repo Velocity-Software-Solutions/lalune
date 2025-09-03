@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\ShippingOptions;
+use App\Models\ShippingOption;
 use Illuminate\Http\Request;
 
 class ShippingOptionController extends Controller
@@ -13,8 +13,8 @@ class ShippingOptionController extends Controller
      */
     public function index()
     {
-        $shippingOptions = ShippingOptions::where('status', 1)->with('cities')->latest()->paginate(10);
-        return view('admin.shipping-options', compact('shippingOptions'));
+        $ShippingOption = ShippingOption::where('status', 1)->with('cities')->latest()->paginate(10);
+        return view('admin.shipping-options', compact('ShippingOption'));
     }
 
     /**
@@ -33,7 +33,7 @@ class ShippingOptionController extends Controller
             'cities.*' => 'required|string|max:2000',
         ]);
 
-        $shippingOption = ShippingOptions::create([
+        $shippingOption = ShippingOption::create([
             'name' => $request->name,
             'name_ar' => $request->name_ar,
             'price' => $request->price,
@@ -58,7 +58,7 @@ class ShippingOptionController extends Controller
     /**
      * Update an existing shipping option.
      */
-    public function update(Request $request, ShippingOptions $shippingOption)
+    public function update(Request $request, ShippingOption $shippingOption)
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
@@ -79,7 +79,7 @@ class ShippingOptionController extends Controller
     /**
      * Delete a shipping option.
      */
-    public function destroy(ShippingOptions $shippingOption)
+    public function destroy(ShippingOption $shippingOption)
     {
         $shippingOption->status = 0;
 

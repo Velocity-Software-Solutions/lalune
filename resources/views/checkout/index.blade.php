@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="max-w-4xl px-4 py-10 mx-auto sm:px-6 lg:px-8 min-h-screen bg-white"
+<div class="px-4 py-10 mx-10 sm:px-6 lg:px-8 min-h-screen bg-white"
      x-data="checkoutState({
         // Server data
         countries: {{ Js::from($countries) }},                // { country: [city, ...] }
@@ -97,7 +97,7 @@
         {{-- Shipping Option --}}
         <div>
             <label class="block mb-1 font-medium text-charcoal">{{ __('checkout.shipping_option') }}</label>
-            <select x-model="selectedShippingId" name="shipping_option_id" required
+            <select x-model="selectedShippingId" name="shipping_option_id"
                     class="w-full p-2 rounded border border-primary/30 bg-white text-charcoal
                            focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary">
                 <option value="" disabled>{{ __('checkout.select_shipping') }}</option>
@@ -153,7 +153,7 @@
         <input type="hidden" name="shipping_cost" :value="shippingCost.toFixed(2)">
 
         <button type="submit"
-                :disabled="!selectedShippingId"
+                {{-- :disabled="!selectedShippingId" --}}
                 class="w-full py-3 text-lg font-semibold text-white bg-gray-700 rounded
                        hover:bg-gray-700/90 focus:outline-none focus:ring-2 focus:ring-black/40
                        disabled:opacity-50 disabled:cursor-not-allowed">

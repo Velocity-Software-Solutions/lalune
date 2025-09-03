@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'currency_aed' => 'AED',
+    'currency_aed' => 'CAD',
     'description'  => 'Description',
     'quantity'     => 'Quantity',
     'add_to_cart'  => 'Add to Cart',

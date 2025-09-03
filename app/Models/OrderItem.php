@@ -3,41 +3,49 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use App\Models\Product;
 
 class OrderItem extends Model
 {
-    use HasFactory;
-
     protected $fillable = [
         'order_id',
         'product_id',
-        'price',         // unit price at time of order
+        'name',
+        'sku',
+        'currency',
+        'stripe_price_id',
+        'stripe_product_id',
         'quantity',
-        'subtotal',      // price * quantity at time of order
+        'unit_price_cents',
+        'subtotal_cents',
+        'discount_cents',
+        'tax_cents',
+        'total_cents',
+        'snapshot',
     ];
 
     protected $casts = [
-        'price'    => 'decimal:2',
-        'subtotal' => 'decimal:2',
+        'snapshot' => 'array',
     ];
 
-    /* --------------------------------------------------------------
-     | Relationships
-     | -------------------------------------------------------------- */
+    // Relationships
     public function order()
     {
         return $this->belongsTo(Order::class);
     }
 
-    /**
-     * Optional: keep historical reference to product;
-     * product may be deleted later.
-     */
     public function product()
     {
         return $this->belongsTo(Product::class);
     }
 
+    // Helpers
+    public function getUnitPriceAttribute(): float
+    {
+        return $this->unit_price_cents / 100;
+    }
+
+    public function getTotalAttribute(): float
+    {
+        return $this->total_cents / 100;
+    }
 }

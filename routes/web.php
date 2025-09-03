@@ -10,10 +10,6 @@ use App\Http\Controllers\CartController;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Session;
 
-Route::middleware(['web'])->group(function () {
-    Route::get('/checkout/confirmation/{order}', [CheckoutController::class, 'confirmation'])->name('checkout.confirmation');
-});
-
 
 
 Route::get('/products', [ProductController::class, 'index'])->name('products.index');
@@ -28,20 +24,21 @@ Route::post('/cart/apply-coupon', [CartController::class, 'applyCoupon'])->name(
 Route::post('/coupon/apply', [CouponController::class, 'apply'])->name('coupon.apply');
 Route::post('/coupon/remove', [CouponController::class, 'remove'])->name('coupon.remove');
 
- Route::get('/checkout', [CheckoutController::class, 'show'])->name(name: 'checkout.index');
-    Route::post('/checkout', [CheckoutController::class, 'process'])->name('checkout.process');
+Route::get('/checkout', [CheckoutController::class, 'show'])->name(name: 'checkout.index');
+Route::post('/checkout', [CheckoutController::class, 'process'])->name('checkout.process');
 Route::get('/checkout', [CheckoutController::class, 'showCheckout'])->name('checkout.show');
-Route::get('/order/confirmation/{order}', [CheckoutController::class, 'confirmation'])->name('checkout.confirmation');
+Route::get('/order/confirmation', [CheckoutController::class, 'confirmation'])
+    ->name('checkout.confirmation');
 Route::get('/checkout/{order}/receipt', [CheckoutController::class, 'downloadReceipt'])->name('checkout.receipt');
 
 Route::middleware(['guest'])->group(function () {
     Route::get('/checkout', [CheckoutController::class, 'show'])->name(name: 'checkout.index');
     Route::post('/checkout', [CheckoutController::class, 'process'])->name('checkout.process');
-Route::get('/checkout', [CheckoutController::class, 'showCheckout'])->name('checkout.show');
+    Route::get('/checkout', [CheckoutController::class, 'showCheckout'])->name('checkout.show');
 
 });
-    Route::get('/checkout', [CheckoutController::class, 'index'])->name(name: 'checkout.index');
- Route::get('/', [StoreController::class, 'home'])->name('home');
+Route::get('/checkout', [CheckoutController::class, 'index'])->name(name: 'checkout.index');
+Route::get('/', [StoreController::class, 'home'])->name('home');
 
 Route::get('/dashboard', function () {
     return view('admin.dashboard');
@@ -55,4 +52,4 @@ Route::get('/lang/{locale}', function ($locale) {
     return redirect()->back();
 })->name('lang.switch');
 
-require __DIR__.'/auth.php';
+require __DIR__ . '/auth.php';
