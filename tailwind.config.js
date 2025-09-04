@@ -16,10 +16,7 @@ export default {
             },
             // tailwind.config.js
             colors: {
-                    primary: "#3f001f",
-                    gold: "#d4af37",
-                    cream: "#f8f1e7",
-                    charcoal: "#1a1a1a",
+                    cream: "#f5f3f0",
             },
         },
     },

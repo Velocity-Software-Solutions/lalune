@@ -35,4 +35,9 @@ return [
         ],
     ],
 
+    'stallion' => [
+        'base' => env('STALLION_BASE', 'https://ship.stallionexpress.ca/api/v4'),
+        'token' => env('STALLION_API_TOKEN'),
+    ],
+
 ];

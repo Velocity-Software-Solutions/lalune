@@ -14,6 +14,8 @@
     <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     @vite(['resources/css/app.css', 'resources/css/mousecursor.css', 'resources/js/app.js', 'resources/js/magiccursor.js'])
+        @stack('head')
+
 </head>
 
 <body class="text-gray-900 bg-gray-50">

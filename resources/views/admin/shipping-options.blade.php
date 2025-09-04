@@ -3,7 +3,8 @@
 @section('title', 'Shipping Options')
 
 @section('content')
-    <div class="h-full max-h-full p-5 mx-3 overflow-scroll bg-white rounded-md shadow-md dark:bg-gray-800 scroll scroll-m-0 custom-scroll">
+    <div
+        class="h-full max-h-full p-5 mx-3 overflow-scroll bg-white rounded-md shadow-md dark:bg-gray-800 scroll scroll-m-0 custom-scroll">
         <!-- Page header -->
         <div class="flex items-center justify-between gap-3 mb-5">
             <h1 class="text-2xl md:text-3xl font-bold text-gray-800 dark:text-white">Shipping Options</h1>
@@ -190,7 +191,7 @@
                             <div class="pt-2 flex justify-end">
                                 <button
                                     class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gray-600 hover:bg-gray-700 text-white">
-                                     Save Changes
+                                    Save Changes
                                 </button>
                             </div>
                         </form>
@@ -212,7 +213,8 @@
             class="mx-auto max-w-2xl rounded-2xl bg-white dark:bg-gray-800 shadow-xl overflow-hidden">
             <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
                 <h2 class="text-lg font-semibold text-gray-800 dark:text-white">Add Shipping Option</h2>
-                <button @click="open=false" class="flex p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-800 dark:text-white">
+                <button @click="open=false"
+                    class="flex p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-800 dark:text-white">
                     <span class="material-icons">close</span>
                 </button>
             </div>
@@ -313,75 +315,75 @@
                 },
 
                 // Data
-countriesMap: {
-    'US': [
-        'Alabama',
-        'Alaska',
-        'Arizona',
-        'Arkansas',
-        'California',
-        'Colorado',
-        'Connecticut',
-        'Delaware',
-        'Florida',
-        'Georgia',
-        'Hawaii',
-        'Idaho',
-        'Illinois',
-        'Indiana',
-        'Iowa',
-        'Kansas',
-        'Kentucky',
-        'Louisiana',
-        'Maine',
-        'Maryland',
-        'Massachusetts',
-        'Michigan',
-        'Minnesota',
-        'Mississippi',
-        'Missouri',
-        'Montana',
-        'Nebraska',
-        'Nevada',
-        'New Hampshire',
-        'New Jersey',
-        'New Mexico',
-        'New York',
-        'North Carolina',
-        'North Dakota',
-        'Ohio',
-        'Oklahoma',
-        'Oregon',
-        'Pennsylvania',
-        'Rhode Island',
-        'South Carolina',
-        'South Dakota',
-        'Tennessee',
-        'Texas',
-        'Utah',
-        'Vermont',
-        'Virginia',
-        'Washington',
-        'West Virginia',
-        'Wisconsin',
-        'Wyoming'
-    ],
-    'Canada': [
-        'Alberta',
-        'British Columbia',
-        'Manitoba',
-        'New Brunswick',
-        'Newfoundland and Labrador',
-        'Northwest Territories',
-        'Nova Scotia',
-        'Nunavut',
-        'Ontario',
-        'Prince Edward Island',
-        'Quebec',
-        'Saskatchewan',
-        'Yukon'
-    ]
-},
+                countriesMap: {
+                    'US': [
+                        'Alabama',
+                        'Alaska',
+                        'Arizona',
+                        'Arkansas',
+                        'California',
+                        'Colorado',
+                        'Connecticut',
+                        'Delaware',
+                        'Florida',
+                        'Georgia',
+                        'Hawaii',
+                        'Idaho',
+                        'Illinois',
+                        'Indiana',
+                        'Iowa',
+                        'Kansas',
+                        'Kentucky',
+                        'Louisiana',
+                        'Maine',
+                        'Maryland',
+                        'Massachusetts',
+                        'Michigan',
+                        'Minnesota',
+                        'Mississippi',
+                        'Missouri',
+                        'Montana',
+                        'Nebraska',
+                        'Nevada',
+                        'New Hampshire',
+                        'New Jersey',
+                        'New Mexico',
+                        'New York',
+                        'North Carolina',
+                        'North Dakota',
+                        'Ohio',
+                        'Oklahoma',
+                        'Oregon',
+                        'Pennsylvania',
+                        'Rhode Island',
+                        'South Carolina',
+                        'South Dakota',
+                        'Tennessee',
+                        'Texas',
+                        'Utah',
+                        'Vermont',
+                        'Virginia',
+                        'Washington',
+                        'West Virginia',
+                        'Wisconsin',
+                        'Wyoming'
+                    ],
+                    'Canada': [
+                        'Alberta',
+                        'British Columbia',
+                        'Manitoba',
+                        'New Brunswick',
+                        'Newfoundland and Labrador',
+                        'Northwest Territories',
+                        'Nova Scotia',
+                        'Nunavut',
+                        'Ontario',
+                        'Prince Edward Island',
+                        'Quebec',
+                        'Saskatchewan',
+                        'Yukon'
+                    ]
+                },
 
 
                 // Methods

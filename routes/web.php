@@ -29,6 +29,8 @@ Route::post('/checkout', [CheckoutController::class, 'process'])->name('checkout
 Route::get('/checkout', [CheckoutController::class, 'showCheckout'])->name('checkout.show');
 Route::get('/order/confirmation', [CheckoutController::class, 'confirmation'])
     ->name('checkout.confirmation');
+Route::post('/order/confirmation/rate', [CheckoutController::class, 'rate'])
+    ->name('checkout.rate');
 Route::get('/checkout/{order}/receipt', [CheckoutController::class, 'downloadReceipt'])->name('checkout.receipt');
 
 Route::middleware(['guest'])->group(function () {

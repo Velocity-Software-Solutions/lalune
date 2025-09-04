@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\ShippingOption;
+use App\Services\StallionRates;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
@@ -19,75 +20,76 @@ class CheckoutController extends Controller
         $cart = session('cart', []);
         $coupon = session('coupon');
 
-$countries = [
-    'US' => [
-        'Alabama',
-        'Alaska',
-        'Arizona',
-        'Arkansas',
-        'California',
-        'Colorado',
-        'Connecticut',
-        'Delaware',
-        'Florida',
-        'Georgia',
-        'Hawaii',
-        'Idaho',
-        'Illinois',
-        'Indiana',
-        'Iowa',
-        'Kansas',
-        'Kentucky',
-        'Louisiana',
-        'Maine',
-        'Maryland',
-        'Massachusetts',
-        'Michigan',
-        'Minnesota',
-        'Mississippi',
-        'Missouri',
-        'Montana',
-        'Nebraska',
-        'Nevada',
-        'New Hampshire',
-        'New Jersey',
-        'New Mexico',
-        'New York',
-        'North Carolina',
-        'North Dakota',
-        'Ohio',
-        'Oklahoma',
-        'Oregon',
-        'Pennsylvania',
-        'Rhode Island',
-        'South Carolina',
-        'South Dakota',
-        'Tennessee',
-        'Texas',
-        'Utah',
-        'Vermont',
-        'Virginia',
-        'Washington',
-        'West Virginia',
-        'Wisconsin',
-        'Wyoming',
-    ],
-    'Canada' => [
-        'Alberta',
-        'British Columbia',
-        'Manitoba',
-        'New Brunswick',
-        'Newfoundland and Labrador',
-        'Northwest Territories',
-        'Nova Scotia',
-        'Nunavut',
-        'Ontario',
-        'Prince Edward Island',
-        'Quebec',
-        'Saskatchewan',
-        'Yukon',
-    ],
-];
+        $countries = [
+            'US' => [
+                'AL' => 'Alabama',
+                'AK' => 'Alaska',
+                'AZ' => 'Arizona',
+                'AR' => 'Arkansas',
+                'CA' => 'California',
+                'CO' => 'Colorado',
+                'CT' => 'Connecticut',
+                'DE' => 'Delaware',
+                'FL' => 'Florida',
+                'GA' => 'Georgia',
+                'HI' => 'Hawaii',
+                'ID' => 'Idaho',
+                'IL' => 'Illinois',
+                'IN' => 'Indiana',
+                'IA' => 'Iowa',
+                'KS' => 'Kansas',
+                'KY' => 'Kentucky',
+                'LA' => 'Louisiana',
+                'ME' => 'Maine',
+                'MD' => 'Maryland',
+                'MA' => 'Massachusetts',
+                'MI' => 'Michigan',
+                'MN' => 'Minnesota',
+                'MS' => 'Mississippi',
+                'MO' => 'Missouri',
+                'MT' => 'Montana',
+                'NE' => 'Nebraska',
+                'NV' => 'Nevada',
+                'NH' => 'New Hampshire',
+                'NJ' => 'New Jersey',
+                'NM' => 'New Mexico',
+                'NY' => 'New York',
+                'NC' => 'North Carolina',
+                'ND' => 'North Dakota',
+                'OH' => 'Ohio',
+                'OK' => 'Oklahoma',
+                'OR' => 'Oregon',
+                'PA' => 'Pennsylvania',
+                'RI' => 'Rhode Island',
+                'SC' => 'South Carolina',
+                'SD' => 'South Dakota',
+                'TN' => 'Tennessee',
+                'TX' => 'Texas',
+                'UT' => 'Utah',
+                'VT' => 'Vermont',
+                'VA' => 'Virginia',
+                'WA' => 'Washington',
+                'WV' => 'West Virginia',
+                'WI' => 'Wisconsin',
+                'WY' => 'Wyoming',
+            ],
+            'Canada' => [
+                'AB' => 'Alberta',
+                'BC' => 'British Columbia',
+                'MB' => 'Manitoba',
+                'NB' => 'New Brunswick',
+                'NL' => 'Newfoundland and Labrador',
+                'NT' => 'Northwest Territories',
+                'NS' => 'Nova Scotia',
+                'NU' => 'Nunavut',
+                'ON' => 'Ontario',
+                'PE' => 'Prince Edward Island',
+                'QC' => 'Quebec',
+                'SK' => 'Saskatchewan',
+                'YT' => 'Yukon',
+            ],
+        ];
+
 
 
         $shippingOptions = ShippingOption::where('status', 1)->with('cities')->get();
@@ -202,161 +204,190 @@ $countries = [
         return redirect()->away($session->url);
     }
 
-public function confirmation(Request $request)
-{
-    $sessionId = $request->query('session_id');
-    abort_unless($sessionId, 404);
+    public function confirmation(Request $request)
+    {
+        $sessionId = $request->query('session_id');
+        abort_unless($sessionId, 404);
 
-    $stripe  = new StripeClient(env('STRIPE_SECRET'));
-    $session = $stripe->checkout->sessions->retrieve($sessionId, ['expand' => ['payment_intent', 'customer']]);
+        $stripe = new StripeClient(env('STRIPE_SECRET'));
+        $session = $stripe->checkout->sessions->retrieve($sessionId, ['expand' => ['payment_intent', 'customer']]);
 
-    if ($session->payment_status !== 'paid') {
-        return redirect()->route('checkout.index')->with('error', 'Payment not completed.');
-    }
+        if ($session->payment_status !== 'paid') {
+            return redirect()->route('checkout.index')->with('error', 'Payment not completed.');
+        }
 
-    // stripe-php < 14:
-    $lineItems = $stripe->checkout->sessions->allLineItems($sessionId, ['limit' => 100]);
-    // stripe-php ^14:
-    // $lineItems = $stripe->checkout->sessions->listLineItems($sessionId, ['limit' => 100]);
+        // stripe-php < 14:
+        $lineItems = $stripe->checkout->sessions->allLineItems($sessionId, ['limit' => 100]);
+        // stripe-php ^14:
+        // $lineItems = $stripe->checkout->sessions->listLineItems($sessionId, ['limit' => 100]);
 
-    // Metadata → plain arrays
-    $piMetaArr = $session->payment_intent && $session->payment_intent->metadata
-        ? $session->payment_intent->metadata->toArray() : [];
-    $seMetaArr = $session->metadata ? $session->metadata->toArray() : [];
+        // Metadata → plain arrays
+        $piMetaArr = $session->payment_intent && $session->payment_intent->metadata
+            ? $session->payment_intent->metadata->toArray() : [];
+        $seMetaArr = $session->metadata ? $session->metadata->toArray() : [];
 
-    $meta = function (string $key, $default = null) use ($piMetaArr, $seMetaArr) {
-        return array_key_exists($key, $piMetaArr)
-            ? $piMetaArr[$key]
-            : (array_key_exists($key, $seMetaArr) ? $seMetaArr[$key] : $default);
-    };
+        $meta = function (string $key, $default = null) use ($piMetaArr, $seMetaArr) {
+            return array_key_exists($key, $piMetaArr)
+                ? $piMetaArr[$key]
+                : (array_key_exists($key, $seMetaArr) ? $seMetaArr[$key] : $default);
+        };
 
-    $cust  = $session->customer_details;
-    $addr  = optional($cust)->address;
-    $email = optional($cust)->email ?? optional($session->customer)->email;
-    $name  = optional($cust)->name;
+        $cust = $session->customer_details;
+        $addr = optional($cust)->address;
+        $email = optional($cust)->email ?? optional($session->customer)->email;
+        $name = optional($cust)->name;
 
-    $bill = [
-        'name'        => $meta('bill_name', $name),
-        'email'       => $meta('bill_email', $email),
-        'line1'       => $meta('bill_line1', null),
-        'line2'       => $meta('bill_line2', null),
-        'city'        => $meta('bill_city', null),
-        'state'       => $meta('bill_state', null),
-        'postal_code' => $meta('bill_postal', null),
-        'country'     => $meta('bill_country', null),
-    ];
+        $bill = [
+            'name' => $meta('bill_name', $name),
+            'email' => $meta('bill_email', $email),
+            'line1' => $meta('bill_line1', null),
+            'line2' => $meta('bill_line2', null),
+            'city' => $meta('bill_city', null),
+            'state' => $meta('bill_state', null),
+            'postal_code' => $meta('bill_postal', null),
+            'country' => $meta('bill_country', null),
+        ];
 
-    $ship = [
-        'name'        => $meta('ship_name', $name),
-        'email'       => $meta('ship_email', $email),
-        'line1'       => $meta('ship_line1', optional($addr)->line1),
-        'line2'       => $meta('ship_line2', optional($addr)->line2),
-        'city'        => $meta('ship_city', optional($addr)->city),
-        'state'       => $meta('ship_state', optional($addr)->state),
-        'postal_code' => $meta('ship_postal', optional($addr)->postal_code),
-        'country'     => $meta('ship_country', optional($addr)->country),
-        'phone'       => optional($cust)->phone,
-    ];
+        $ship = [
+            'name' => $meta('ship_name', $name),
+            'email' => $meta('ship_email', $email),
+            'line1' => $meta('ship_line1', optional($addr)->line1),
+            'line2' => $meta('ship_line2', optional($addr)->line2),
+            'city' => $meta('ship_city', optional($addr)->city),
+            'state' => $meta('ship_state', optional($addr)->state),
+            'postal_code' => $meta('ship_postal', optional($addr)->postal_code),
+            'country' => $meta('ship_country', optional($addr)->country),
+            'phone' => optional($cust)->phone,
+        ];
 
-    $currency   = strtoupper($session->currency);
-    $totalCents = (int) $session->amount_total;
-    $subCents   = (int) $session->amount_subtotal;
-    $discCents  = (int) (optional($session->total_details)->amount_discount ?? 0);
-    $shipCents  = (int) (optional($session->total_details)->amount_shipping ?? 0);
-    $taxCents   = (int) (optional($session->total_details)->amount_tax ?? 0);
+        $currency = strtoupper($session->currency);
+        $totalCents = (int) $session->amount_total;
+        $subCents = (int) $session->amount_subtotal;
+        $discCents = (int) (optional($session->total_details)->amount_discount ?? 0);
+        $shipCents = (int) (optional($session->total_details)->amount_shipping ?? 0);
+        $taxCents = (int) (optional($session->total_details)->amount_tax ?? 0);
 
-    $paymentIntentId = is_string($session->payment_intent)
-        ? $session->payment_intent
-        : (optional($session->payment_intent)->id ?? null);
+        $paymentIntentId = is_string($session->payment_intent)
+            ? $session->payment_intent
+            : (optional($session->payment_intent)->id ?? null);
 
-    // --- SAFE user_id resolution (no 0)
-    $userId = auth()->id();
-    if (!$userId) {
-        $uidMeta = $meta('user_id');
-        if (is_string($uidMeta) && ctype_digit($uidMeta)) {
-            $candidate = (int) $uidMeta;
-            if (User::whereKey($candidate)->exists()) {
-                $userId = $candidate;
+        // --- SAFE user_id resolution (no 0)
+        $userId = auth()->id();
+        if (!$userId) {
+            $uidMeta = $meta('user_id');
+            if (is_string($uidMeta) && ctype_digit($uidMeta)) {
+                $candidate = (int) $uidMeta;
+                if (User::whereKey($candidate)->exists()) {
+                    $userId = $candidate;
+                }
             }
         }
-    }
 
-    $itemsSnapshot = collect($lineItems->data)->map(fn($li) => [
-        'description'     => $li->description,
-        'quantity'        => (int) ($li->quantity ?? 1),
-        'amount_total'    => (int) ($li->amount_total ?? 0),
-        'amount_subtotal' => (int) ($li->amount_subtotal ?? 0),
-        'currency'        => strtoupper($li->currency ?? $currency),
-    ])->all();
+        $itemsSnapshot = collect($lineItems->data)->map(fn($li) => [
+            'description' => $li->description,
+            'quantity' => (int) ($li->quantity ?? 1),
+            'amount_total' => (int) ($li->amount_total ?? 0),
+            'amount_subtotal' => (int) ($li->amount_subtotal ?? 0),
+            'currency' => strtoupper($li->currency ?? $currency),
+        ])->all();
 
-    $order = Order::firstOrCreate(
-        ['stripe_session_id' => $sessionId],
-        [
-            'user_id'               => $userId, // null for guests
-            'coupon_id'             => null,
-            'shipping_option_id'    => null,
+        $order = Order::firstOrCreate(
+            ['stripe_session_id' => $sessionId],
+            [
+                'user_id' => $userId, // null for guests
+                'coupon_id' => null,
+                'shipping_option_id' => null,
 
-            'order_number'          => 'ORD-' . now()->format('Ymd') . '-' . strtoupper(Str::random(6)),
-            'stripe_payment_intent' => $paymentIntentId,
-            'stripe_customer_id'    => is_string($session->customer) ? $session->customer : (optional($session->customer)->id ?? null),
+                'order_number' => 'ORD-' . now()->format('Ymd') . '-' . strtoupper(Str::random(6)),
+                'stripe_payment_intent' => $paymentIntentId,
+                'stripe_customer_id' => is_string($session->customer) ? $session->customer : (optional($session->customer)->id ?? null),
 
-            'full_name'             => $ship['name'] ?? $bill['name'],
-            'email'                 => $ship['email'] ?? $bill['email'],
-            'phone'                 => $ship['phone'] ?? null,
+                'full_name' => $ship['name'] ?? $bill['name'],
+                'email' => $ship['email'] ?? $bill['email'],
+                'phone' => $ship['phone'] ?? null,
 
-            'currency'              => $currency,
-            'subtotal_cents'        => $subCents,
-            'discount_cents'        => $discCents,
-            'shipping_cents'        => $shipCents,
-            'tax_cents'             => $taxCents,
-            'total_cents'           => $totalCents,
+                'currency' => $currency,
+                'subtotal_cents' => $subCents,
+                'discount_cents' => $discCents,
+                'shipping_cents' => $shipCents,
+                'tax_cents' => $taxCents,
+                'total_cents' => $totalCents,
 
-            'payment_status'        => 'paid',
-            'order_status'          => 'processing',
-            'payment_method'        => 'stripe_checkout',
-            'paid_at'               => now(),
+                'payment_status' => 'paid',
+                'order_status' => 'processing',
+                'payment_method' => 'stripe_checkout',
+                'paid_at' => now(),
 
-            'shipping_address_json' => $ship,
-            'billing_address_json'  => $bill,
+                'shipping_address_json' => $ship,
+                'billing_address_json' => $bill,
 
-            'coupon_code'           => $piMetaArr['coupon_code'] ?? $seMetaArr['coupon_code'] ?? null,
-            'ip_address'            => $request->ip(),
-            'user_agent'            => substr((string) $request->userAgent(), 0, 1000),
+                'coupon_code' => $piMetaArr['coupon_code'] ?? $seMetaArr['coupon_code'] ?? null,
+                'ip_address' => $request->ip(),
+                'user_agent' => substr((string) $request->userAgent(), 0, 1000),
 
-            'snapshot'              => $itemsSnapshot,
-            'metadata'              => ['stripe' => ['mode' => $session->mode]],
-            'notes'                 => null,
-        ]
-    );
+                'snapshot' => $itemsSnapshot,
+                'metadata' => ['stripe' => ['mode' => $session->mode]],
+                'notes' => null,
+            ]
+        );
 
-    if ($order->wasRecentlyCreated) {
-        foreach ($lineItems->data as $li) {
-            $qty       = (int) ($li->quantity ?? 1);
-            $lineTotal = (int) ($li->amount_total ?? 0);
-            $lineSub   = (int) ($li->amount_subtotal ?? $lineTotal);
-            $unitCents = $qty > 0 ? intdiv($lineSub, $qty) : 0;
+        if ($order->wasRecentlyCreated) {
+            foreach ($lineItems->data as $li) {
+                $qty = (int) ($li->quantity ?? 1);
+                $lineTotal = (int) ($li->amount_total ?? 0);
+                $lineSub = (int) ($li->amount_subtotal ?? $lineTotal);
+                $unitCents = $qty > 0 ? intdiv($lineSub, $qty) : 0;
 
-            OrderItem::create([
-                'order_id'           => $order->id,
-                'product_id'         => null,
-                'name'               => $li->description,
-                'quantity'           => $qty,
-                'unit_price_cents'   => $unitCents,
-                'subtotal_cents'     => $lineSub,
-                'discount_cents'     => max(0, $lineSub - $lineTotal),
-                'tax_cents'          => 0,
-                'total_cents'        => $lineTotal,
-                'currency'           => strtoupper($li->currency ?? $currency),
-                'snapshot'           => ['stripe_line_item' => $li],
-            ]);
+                OrderItem::create([
+                    'order_id' => $order->id,
+                    'product_id' => null,
+                    'name' => $li->description,
+                    'quantity' => $qty,
+                    'unit_price_cents' => $unitCents,
+                    'subtotal_cents' => $lineSub,
+                    'discount_cents' => max(0, $lineSub - $lineTotal),
+                    'tax_cents' => 0,
+                    'total_cents' => $lineTotal,
+                    'currency' => strtoupper($li->currency ?? $currency),
+                    'snapshot' => ['stripe_line_item' => $li],
+                ]);
+            }
+
+            session()->forget(['cart', 'coupon']);
         }
 
-        session()->forget(['cart', 'coupon']);
+        return view('checkout.receipt', compact('order', 'session'));
     }
 
-    return view('checkout.receipt', compact('order', 'session'));
-}
+    // public function rate(StallionRates $stallion, Request $request)
+    // {
+    //     $rates = $stallion->quote(
+    //         [
+    //             'city' => 'London',
+    //             'province_code' => 'ON',
+    //             'postal_code' => 'N6P 0A8',
+    //             'country_code' => 'CA',
+    //             'is_residential' => true,
+    //         ],
+    //         [
+    //             'weight_unit' => 'lbs',
+    //             'weight' => 0.6,
+    //             'length' => 9,
+    //             'width' => 12,
+    //             'height' => 1,
+    //             'size_unit' => 'cm',
+    //         ],
+    //         [
+    //             'value' => 20,                   // 👈 REQUIRED when no items[]
+    //             'currency' => 'CAD',
+    //             'package_contents' => 'Merchandise',
+    //             // 'postage_types' => ['Cheapest Tracked'],
+    //         ]
+    //     );
 
+
+    //     return response()->json($rates);
+    // }
     public function downloadReceipt(Order $order)
     {
         // Optional: restrict access to owner
