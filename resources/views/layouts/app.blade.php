@@ -5,7 +5,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ config('app.name', 'Al Khinjar Al Dhahbi') }}</title>
+    <title>{{ config('app.name', 'Lalune By NE') }}</title>
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -19,12 +19,12 @@
 </head>
 
 <body class="text-gray-900 bg-gray-50">
-    <header class="top-0 z-50 shadow bg-black mx-6 rounded-3xl">
-        <div class="flex items-center justify-between px-[5%] py-4 mx-auto max-w-7xl">
+    <header class="top-0 z-50 shadow bg-black m-6 rounded-3xl">
+        <div class="flex items-center justify-between px-[5%] py-2 mx-auto max-w-7xl">
             <div class="flex justify-center items-center gap-8">
                 <a href="/" class="text-2xl font-bold text-bg-700">
                     <img src="{{ asset('images/logo-horizontal.jpg') }}" alt="{{ __('messages.logo_alt') }}"
-                        class="h-[70px] mb-4">
+                        class="h-[80px] lg:h-[90px] xl:h-[100px]"> 
 
                 </a>
             </div>

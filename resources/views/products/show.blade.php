@@ -62,7 +62,7 @@
                                 class="block w-24 mt-1 border-gray-300 rounded-md shadow-sm focus:ring-gray-500 focus:border-gray-500">
                         </div>
                         <button type="submit"
-                            class="px-6 py-2 text-white transition duration-200 bg-charcoal rounded-lg hover:bg-gray-700 flex items-center justify-center gap-4">
+                            class="px-6 py-2 text-white transition duration-200 bg-black rounded-lg hover:bg-gray-700 flex items-center justify-center gap-4">
                             <span class="material-icons">add_shopping_cart</span>
                             {{ __('product.add_to_cart') }}
                         </button>
