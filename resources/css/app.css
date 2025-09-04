@@ -34,7 +34,7 @@
 
 .nav-item {
   margin: 0px;
-  color: #000;
+  color: #fff;
   border-bottom-width: 2px;
   border-color: transparent;
   transition: all 0.5s linear;
@@ -44,7 +44,7 @@
 }
 
 .nav-item.active {
-  color: #000;
+  color: #fff;
   border-bottom: 2px solid #2222;
 
 }
@@ -58,7 +58,7 @@
   transform-origin: center;
   width: 100%;
   height: 2px;
-  background-color: #000;
+  background-color: #fff;
   transition: transform 0.3s ease;
 }
 
@@ -69,7 +69,7 @@
 
 .nav-item2 {
   margin: 20px;
-  color: #000;
+  color: #fff;
   border-bottom-width: 2px;
   border-color: transparent;
   transition: all 0.5s linear;
@@ -77,13 +77,13 @@
 
 .nav-item2:hover {
   margin: 2px;
-  color: #000;
-  border-bottom: 2px solid #000;
+  color: #fff;
+  border-bottom: 2px solid #fff;
 }
 
 .nav-item3 {
   margin: 10px;
-  color: #000;
+  color: #fff;
   border-bottom-width: 2px;
   border-color: transparent;
   transition: all 0.5s linear;
@@ -91,7 +91,7 @@
 
 .nav-item3:hover {
   margin: 10px;
-  color: #000;
+  color: #fff;
 }
 
 .product-box {

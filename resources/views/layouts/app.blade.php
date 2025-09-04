@@ -19,22 +19,22 @@
 </head>
 
 <body class="text-gray-900 bg-gray-50">
-    <header class="top-0 z-50 shadow">
-        <div class="flex items-center justify-between px-[10%] py-4 mx-auto max-w-7xl">
+    <header class="top-0 z-50 shadow bg-black mx-6 rounded-3xl">
+        <div class="flex items-center justify-between px-[5%] py-4 mx-auto max-w-7xl">
             <div class="flex justify-center items-center gap-8">
-                <a href="/" class="text-2xl font-bold text-bg-700 bg-\[#f8f1e7]">
-                    <img src="{{ asset('images/logo.jpeg') }}" alt="{{ __('messages.logo_alt') }}"
-                        class="rounded-full w-[70px] h-[70px] mb-4 object-bottom">
+                <a href="/" class="text-2xl font-bold text-bg-700">
+                    <img src="{{ asset('images/logo-horizontal.jpg') }}" alt="{{ __('messages.logo_alt') }}"
+                        class="h-[70px] mb-4">
 
                 </a>
             </div>
 
 
             <nav class="gap-6 flex items-center">
-                <a href="/" class="nav-item hover:text-gray-800"><span
+                <a href="/" class="nav-item hover:text-gray-200"><span
                         class="text-2xl material-icons">home</span></a>
 
-                <a href="{{ route('cart.index') }}" class="nav-item hover:text-gray-800 relative"
+                <a href="{{ route('cart.index') }}" class="nav-item hover:text-gray-200 relative"
                     style="vertical-align: sub;">
                     <span class="text-2xl material-icons">shopping_cart</span>
                     @if (session('cart'))
@@ -44,11 +44,11 @@
 
                 @auth
                     <a href="{{ route('dashboard') }}"
-                        class="nav-item hover:text-gray-800">{{ __('messages.nav_dashboard') }}</a>
+                        class="nav-item hover:text-gray-200">{{ __('messages.nav_dashboard') }}</a>
                     <form action="{{ route('logout') }}" method="POST" class="inline">
                         @csrf
                         <button type="submit"
-                            class="nav-item hover:text-gray-800">{{ __('messages.nav_logout') }}</button>
+                            class="nav-item hover:text-gray-200">{{ __('messages.nav_logout') }}</button>
                     </form>
                 @else
                 @endauth
