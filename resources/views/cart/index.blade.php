@@ -70,7 +70,7 @@
             </a>
         </div>
     @else
-        <div class="text-gray-600">
+        <div class="text-gray-600 text-center">
             {{ __('cart.empty') }}
         </div>
     @endif

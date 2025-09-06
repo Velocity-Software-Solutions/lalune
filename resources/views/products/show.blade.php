@@ -54,13 +54,33 @@
 
                     <form action="{{ route('cart.add', $product->id) }}" method="POST">
                         @csrf
-                        <div class="mb-4">
-                            <label for="quantity" class="block text-sm font-medium text-gray-700">
+                        <div class="mb-4" x-data="{ qty: 1, maxQty: {{ $product->stock_quantity }} }">
+                            <label for="quantity" class="block text-sm font-medium text-gray-700 mb-2">
                                 {{ __('product.quantity') }}
                             </label>
-                            <input type="number" name="quantity" id="quantity" value="1" min="1"
-                                class="block w-24 mt-1 border-gray-300 rounded-md shadow-sm focus:ring-gray-500 focus:border-gray-500">
+
+                            <div class="flex items-center rounded-md overflow-hidden w-24">
+                                <!-- Minus -->
+                                <button type="button" @click="if(qty > 1) qty--" :disabled="qty <= 1"
+                                    class="w-full py-1 bg-gray-200 hover:bg-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed">
+                                    <span class="material-icons text-lg">remove</span>
+                                </button>
+
+                                <!-- Qty display (form input) -->
+                                <input type="text" readonly name="quantity" id="quantity" :value="qty"
+                                    class="flex-1 w-12 text-center border-y border-gray-300 focus:ring-0 focus:outline-none py-1 mx-1 rounded-md">
+
+                                <!-- Plus -->
+                                <button type="button" @click="if(qty < maxQty) qty++" :disabled="qty >= maxQty"
+                                    class="w-full py-1 bg-gray-200 hover:bg-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed">
+                                    <span class="material-icons text-lg">add</span>
+                                </button>
+                            </div>
+
+                            <p class="mt-2 text-xs text-gray-500" x-text="`Available: ${maxQty}`"></p>
                         </div>
+
+
                         <button type="submit"
                             class="px-6 py-2 text-white transition duration-200 bg-black rounded-lg hover:bg-gray-700 flex items-center justify-center gap-4">
                             <span class="material-icons">add_shopping_cart</span>
