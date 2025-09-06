@@ -5,6 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\ProductImage;
 use App\Models\Category;
+use App\Models\Collection;
+
 
 class Product extends Model
 {
@@ -20,7 +22,9 @@ class Product extends Model
         'stock_quantity',
         'condition',
         'status',
-        'category_id'
+        'category_id',
+        'collection_id'
+
     ];
 
     public function images()
@@ -37,6 +41,11 @@ class Product extends Model
     public function category()
     {
         return $this->belongsTo(Category::class);
+    }
+
+        public function collection()
+    {
+        return $this->belongsTo(Collection::class);
     }
 
 }

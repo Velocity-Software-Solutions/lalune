@@ -48,6 +48,33 @@ document.addEventListener("DOMContentLoaded", () => {
         });
 });
 
+function typeText(el, text, delay = 50) {
+    let i = 0;
+    const interval = setInterval(() => {
+      el.textContent += text[i];
+      i++;
+      if (i >= text.length) clearInterval(interval);
+    }, delay);
+  }
+  
+  const animateText = new IntersectionObserver((entries, obs) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting && !entry.target.classList.contains('animated')) {
+        const el = entry.target;
+        const text = el.getAttribute('data-text');
+        el.textContent = ''; // Clear before typing
+        typeText(el, text, 60); // Adjust speed here
+        el.classList.add('animated');
+        obs.unobserve(el);
+      }
+    });
+  }, {
+    threshold: 0.6
+  });
+  
+  document.querySelectorAll('.typewriter-text').forEach(el => {
+    animateText.observe(el);
+  });
 
 const observer = new IntersectionObserver((entries, observer) => {
   entries.forEach(entry => {

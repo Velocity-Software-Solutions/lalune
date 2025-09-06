@@ -11,7 +11,7 @@ class ProductController extends Controller
     {
 
         $products = Product::with('images')->latest()->take(6)->get();
-        return view('products.index', compact(var_name: 'products'));
+        return view('products.index', compact( 'products'));
     }
 
     public function show($id)

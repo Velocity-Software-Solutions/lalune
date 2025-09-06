@@ -14,7 +14,7 @@
     <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     @vite(['resources/css/app.css', 'resources/css/mousecursor.css', 'resources/js/app.js', 'resources/js/magiccursor.js'])
-        @stack('head')
+    @stack('head')
 
 </head>
 
@@ -24,7 +24,7 @@
             <div class="flex justify-center items-center gap-8">
                 <a href="/" class="text-2xl font-bold text-bg-700">
                     <img src="{{ asset('images/logo-horizontal.jpg') }}" alt="{{ __('messages.logo_alt') }}"
-                        class="h-[80px] lg:h-[90px] xl:h-[100px]"> 
+                        class="h-[80px] lg:h-[90px] xl:h-[100px]">
 
                 </a>
             </div>
@@ -38,10 +38,21 @@
                     style="vertical-align: sub;">
                     <span class="text-2xl material-icons">shopping_cart</span>
                     @if (session('cart'))
-                        <p class="absolute top-0 right-0 z-10 bg-gray-200 text-black text-xs rounded-full flex justify-center items-center w-[12px] h-[12px] font-semibold !translate-x-0 fade-left">{{ count(session('cart')) }}</p>
+                        <p
+                            class="absolute top-0 right-0 z-10 bg-gray-200 text-black text-xs rounded-full flex justify-center items-center w-[12px] h-[12px] font-semibold !translate-x-0 fade-left">
+                            {{ count(session('cart')) }}</p>
                     @endif
                 </a>
 
+                <a href="{{ route('collections') }}" class="nav-item hover:text-gray-200 relative"
+                    style="vertical-align: sub;">
+                    Collections
+                </a>
+
+                <a href="{{ route('about-us') }}" class="nav-item hover:text-gray-200 relative"
+                    style="vertical-align: sub;">
+                    About Us
+                </a>
                 @auth
                     <a href="{{ route('dashboard') }}"
                         class="nav-item hover:text-gray-200">{{ __('messages.nav_dashboard') }}</a>

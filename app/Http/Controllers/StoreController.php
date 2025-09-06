@@ -27,6 +27,7 @@ class StoreController extends Controller
                 return $p->category->name ?? 'Uncategorized';
             });
 
+            
         return view('index', compact('products'));
     }
 

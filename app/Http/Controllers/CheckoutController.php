@@ -138,7 +138,7 @@ class CheckoutController extends Controller
         }
 
         $subtotal = array_reduce($cart, fn($c, $i) => $c + ((int) $i['price'] * (int) $i['quantity']), 0);
-        $shippingCents = (int) round($request->shipping_cost * 100);
+        $shippingCents = (int) round(15 * 100);
         $discountCents = 0;
 
         if ($coupon) {

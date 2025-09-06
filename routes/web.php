@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\CollectionController;
+use App\Http\Controllers\ContactController;
 use App\Http\Controllers\CouponController;
 use App\Http\Middleware\SetLocale;
 use Illuminate\Support\Facades\Route;
@@ -12,46 +14,92 @@ use Illuminate\Support\Facades\Session;
 
 
 
-Route::get('/products', [ProductController::class, 'index'])->name('products.index');
-Route::get('/products/{id}', [ProductController::class, 'show'])->name('products.show');
+// Storefront home page
+Route::get('/', [StoreController::class, 'home'])->name('home');
+
+// Product listing & details
+Route::get('/products', [ProductController::class, 'index'])->name('products.index');   // Show all products
+Route::get('/products/{id}', [ProductController::class, 'show'])->name('products.show'); // Show single product
+
+// Collections 
+Route::get('/collections', [CollectionController::class, 'index'])->name('collections');
+
+//About Us
+Route::get('/about-us', function () {
+return view('about');
+})->name('about-us');
+
+//Contact Form Submisssion
+//About Us
+Route::post('contact', [ContactController::class,'submit'])->name('contact.submit');
 
 
+/*
+|--------------------------------------------------------------------------
+| Cart & Coupon Routes
+|--------------------------------------------------------------------------
+*/
+
+// View cart
 Route::get('/cart', [CartController::class, 'index'])->name('cart.index');
-Route::post('/cart/add/{id}', [CartController::class, 'add'])->name('cart.add');
-Route::put('/cart/update/{id}', [CartController::class, 'update'])->name('cart.update');
-Route::delete('/cart/remove/{id}', [CartController::class, 'remove'])->name('cart.remove');
+
+// Cart actions
+Route::post('/cart/add/{id}', [CartController::class, 'add'])->name('cart.add');         // Add product to cart
+Route::put('/cart/update/{id}', [CartController::class, 'update'])->name('cart.update'); // Update quantity
+Route::delete('/cart/remove/{id}', [CartController::class, 'remove'])->name('cart.remove'); // Remove item
+
+// Coupon actions (two possible endpoints for flexibility)
 Route::post('/cart/apply-coupon', [CartController::class, 'applyCoupon'])->name('cart.applyCoupon');
 Route::post('/coupon/apply', [CouponController::class, 'apply'])->name('coupon.apply');
 Route::post('/coupon/remove', [CouponController::class, 'remove'])->name('coupon.remove');
 
-Route::get('/checkout', [CheckoutController::class, 'show'])->name(name: 'checkout.index');
+/*
+|--------------------------------------------------------------------------
+| Checkout & Orders
+|--------------------------------------------------------------------------
+*/
+
+// Checkout process
+Route::get('/checkout', [CheckoutController::class, 'show'])->name('checkout.index');   // Checkout page
 Route::post('/checkout', [CheckoutController::class, 'process'])->name('checkout.process');
-Route::get('/checkout', [CheckoutController::class, 'showCheckout'])->name('checkout.show');
-Route::get('/order/confirmation', [CheckoutController::class, 'confirmation'])
-    ->name('checkout.confirmation');
-Route::post('/order/confirmation/rate', [CheckoutController::class, 'rate'])
-    ->name('checkout.rate');
+
+// Order confirmation & rating
+Route::get('/order/confirmation', [CheckoutController::class, 'confirmation'])->name('checkout.confirmation');
+Route::post('/order/confirmation/rate', [CheckoutController::class, 'rate'])->name('checkout.rate');
+
+// Download receipt
 Route::get('/checkout/{order}/receipt', [CheckoutController::class, 'downloadReceipt'])->name('checkout.receipt');
 
-Route::middleware(['guest'])->group(function () {
-    Route::get('/checkout', [CheckoutController::class, 'show'])->name(name: 'checkout.index');
-    Route::post('/checkout', [CheckoutController::class, 'process'])->name('checkout.process');
-    Route::get('/checkout', [CheckoutController::class, 'showCheckout'])->name('checkout.show');
+/*
+|--------------------------------------------------------------------------
+| Admin & Authenticated Routes
+|--------------------------------------------------------------------------
+*/
 
-});
-Route::get('/checkout', [CheckoutController::class, 'index'])->name(name: 'checkout.index');
-Route::get('/', [StoreController::class, 'home'])->name('home');
-
+// Admin dashboard (only for authenticated users)
 Route::get('/dashboard', function () {
     return view('admin.dashboard');
 })->middleware(['auth'])->name('dashboard');
 
+/*
+|--------------------------------------------------------------------------
+| Language Switcher
+|--------------------------------------------------------------------------
+*/
+
+// Switch site language (en / ar)
 Route::get('/lang/{locale}', function ($locale) {
     if (in_array($locale, ['en', 'ar'])) {
         Session::put('locale', $locale);
-        App::setLocale($locale); // optional: apply immediately
+        App::setLocale($locale); // Apply immediately (optional)
     }
     return redirect()->back();
 })->name('lang.switch');
+
+/*
+|--------------------------------------------------------------------------
+| Authentication Routes
+|--------------------------------------------------------------------------
+*/
 
 require __DIR__ . '/auth.php';

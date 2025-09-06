@@ -23,9 +23,9 @@ return new class extends Migration {
             $table->decimal('price');
             $table->decimal('discount_price')->nullable();
             $table->integer('stock_quantity');
-            $table->string('condition')->default('antique');
             $table->boolean('status');
             $table->foreignId('category_id')->constrained()->on('categories')->onDelete('cascade');
+            $table->foreignId('collection_id')->constrained()->on('cellections')->onDelete('cascade');
             $table->timestamps();
 
         });
