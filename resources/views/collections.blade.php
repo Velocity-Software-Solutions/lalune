@@ -1,14 +1,13 @@
 @extends('layouts.app')
 
 @section('content')
-    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
     <div x-data="{ showModal: false, modalImage: '' }" class="min-h-screen bg-gray-50">
-        <div class="h-[60vh] mx-6 rounded-3xl bg-cover bg-center bg-no-repeat bg-fixed"
+        <div class="h-[30vh] md:h-[60vh] mx-6 rounded-3xl bg-cover bg-center bg-no-repeat bg-fixed"
             style="background-image:url('{{ asset('images/collections-hero.jpg') }}');">
             <!-- Optional overlay -->
             <div class="w-full h-full bg-black/30 flex items-center justify-center rounded-3xl">
-                <h1 class="text-6xl montserrat-bolder text-white/90">Our Collections</h1>
+                <h1 class="text-3xl md:text-6xl montserrat-bolder text-white/90">Our Collections</h1>
             </div>
         </div>
         <div class="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">

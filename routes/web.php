@@ -30,9 +30,22 @@ return view('about');
 })->name('about-us');
 
 //Contact Form Submisssion
-//About Us
 Route::post('contact', [ContactController::class,'submit'])->name('contact.submit');
 
+//Return Policy
+Route::get('/return-policy', function () {
+return view('return-policy');
+})->name('return-policy');
+
+//Terms & Conditions
+Route::get('/terms-conditions', function () {
+return view('terms-conditions');
+})->name('terms-conditions');
+
+//Privacy Policy
+Route::get('/privacy-policy', function () {
+return view('privacy-policy');
+})->name('privacy-policy');
 
 /*
 |--------------------------------------------------------------------------
