@@ -10,7 +10,7 @@
         style="background-image:url('{{ asset('images/about-hero.png') }}'); background-size:cover; background-position:center; background-attachment: fixed;">
 
         <!-- subtle dark veil for readability -->
-        <div class="absolute inset-0 bg-black/10"></div>
+        <div class="absolute inset-0 bg-black/30"></div>
 
         <!-- content container -->
         <div class="relative px-6 sm:px-10 lg:px-14 py-14 lg:py-20">
@@ -20,7 +20,7 @@
                 </h1>
 
                 <p
-                    class="text-base md:text-lg leading-relaxed text-white/90 bg-black rounded-xl p-4 md:p-5 backdrop-blur-sm">
+                    class="text-base md:text-lg leading-relaxed text-white/90 bg-black/50 rounded-xl p-4 md:p-5 backdrop-blur-sm">
                     At La lune by NE, we believe clothing is more than what you wear – it’s how you feel. Our brand was born
                     from a love for simple, feminine, and timeless style that embraces modesty without compromising on
                     elegance.
