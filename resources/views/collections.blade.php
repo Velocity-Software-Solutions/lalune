@@ -3,8 +3,9 @@
 @section('content')
 
     <div x-data="{ showModal: false, modalImage: '' }" class="min-h-screen bg-gray-50">
-        <div class="h-[30vh] md:h-[60vh] mx-6 rounded-3xl bg-cover bg-center bg-no-repeat bg-fixed"
-            style="background-image:url('{{ asset('images/collections-hero.jpg') }}');">
+<div class="h-[30vh] md:h-[60vh] mx-6 rounded-3xl 
+            hero-bg bg-center bg-no-repeat md:bg-fixed"
+     style="background-image:url('{{ asset('images/collections-hero.jpg') }}');">
             <!-- Optional overlay -->
             <div class="w-full h-full bg-black/30 flex items-center justify-center rounded-3xl">
                 <h1 class="text-3xl md:text-6xl montserrat-bolder text-white/90">Our Collections</h1>

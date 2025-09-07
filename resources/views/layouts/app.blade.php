@@ -34,9 +34,9 @@
 
     {{-- Desktop Nav --}}
     <nav class="hidden md:flex gap-6 items-center text-gray-100">
-      <a href="/" class="hover:text-gray-200"><span class="text-2xl material-icons">home</span></a>
+      <a href="/" class="nav-item hover:text-gray-200"><span class="text-2xl material-icons">home</span></a>
 
-      <a href="{{ route('cart.index') }}" class="hover:text-gray-200 relative">
+      <a href="{{ route('cart.index') }}" class="nav-item hover:text-gray-200 relative">
         <span class="text-2xl material-icons">shopping_cart</span>
         @if (session('cart'))
           <span class="absolute -top-1 -right-1 bg-gray-200 text-black text-[10px] rounded-full w-4 h-4 inline-flex items-center justify-center font-semibold">
@@ -45,8 +45,8 @@
         @endif
       </a>
 
-      <a href="{{ route('collections') }}" class="hover:text-gray-200">Collections</a>
-      <a href="{{ route('about-us') }}" class="hover:text-gray-200">About Us</a>
+      <a href="{{ route('collections') }}" class="nav-item hover:text-gray-200">Collections</a>
+      <a href="{{ route('about-us') }}" class="nav-item hover:text-gray-200">About Us</a>
 
       {{-- Policies dropdown (desktop) --}}
       <div x-data="{ open:false }" class="relative">

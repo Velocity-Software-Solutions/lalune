@@ -24,7 +24,7 @@
   <div class="p-4">
     {{-- your existing sidebar content (logo, user block, nav) --}}
     <div class="flex flex-col items-center justify-center text-black dark:text-white">
-      <img src="{{ asset('images/logo.jpg') }}" alt="Antiques Shop" class="rounded-full w-[70px] h-[70px] mb-4">
+      <img src="{{ asset('images/logo.jpeg') }}" alt="Antiques Shop" class="rounded-full w-[70px] h-[70px] mb-4">
       <p class="text-xl font-semibold ">{{ auth()->user()->name }}</p>
       <p class="text-sm text-gray-700 dark:text-gray-300 font-regular">{{ auth()->user()->email }}</p>
 
