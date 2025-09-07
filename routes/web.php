@@ -73,7 +73,7 @@ Route::post('/coupon/remove', [CouponController::class, 'remove'])->name('coupon
 */
 
 // Checkout process
-Route::get('/checkout', [CheckoutController::class, 'show'])->name('checkout.index');   // Checkout page
+Route::get('/checkout', [CheckoutController::class, 'index'])->name('checkout.index');   // Checkout page
 Route::post('/checkout', [CheckoutController::class, 'process'])->name('checkout.process');
 
 // Order confirmation & rating
