@@ -15,7 +15,7 @@
         <!-- content container -->
         <div class="relative px-6 sm:px-10 lg:px-14 py-14 lg:py-20">
             <div class="sm:max-w-[36rem] md:max-w-[20rem] lg:max-w-[42rem] xl:max-w-[54rem] pr-0 lg:pr-40">
-                <h1 class="text-5xl md:text-6xl lg:text-7xl font-bold text-white drop-shadow-sm mb-5">
+                <h1 class="text-3xl md:text-3xl lg:text-5xl font-semibold text-white drop-shadow-sm mb-5 font-serif">
                     About <span style="font-family:'Dancing Script', cursive;">LaLune By NE</span>
                 </h1>
 
