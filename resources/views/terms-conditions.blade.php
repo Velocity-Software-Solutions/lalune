@@ -96,7 +96,7 @@
       <h2 class="text-2xl font-semibold mb-2">9. Contact Us</h2>
       <p class="text-gray-700">
         For questions regarding these Terms & Conditions, please contact us at 
-        <a href="mailto:support@lalunebyne.com" class="text-black font-medium underline">support@lalunebyne.com</a>.
+        <a href="mailto:info@lalunebyne.com" class="text-black font-medium underline">info@lalunebyne.com</a>.
       </p>
     </div>
 

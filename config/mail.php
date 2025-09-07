@@ -39,14 +39,24 @@ return [
 
         'smtp' => [
             'transport' => 'smtp',
-            'scheme' => env('MAIL_SCHEME'),
-            'url' => env('MAIL_URL'),
-            'host' => env('MAIL_HOST', '127.0.0.1'),
-            'port' => env('MAIL_PORT', 2525),
+            'host' => env('MAIL_HOST', 'smtp.office365.com'),
+            'port' => env('MAIL_PORT', 587),
+            'encryption' => env('MAIL_ENCRYPTION', 'tls'),
             'username' => env('MAIL_USERNAME'),
             'password' => env('MAIL_PASSWORD'),
             'timeout' => null,
-            'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url((string) env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
+            'auth_mode' => null,
+        ],
+
+        'noreply' => [
+            'transport' => 'smtp',
+            'host' => env('NOREPLY_MAIL_HOST', 'mail.lalunebyne.com'),
+            'port' => env('NOREPLY_MAIL_PORT', 587),
+            'encryption' => env('NOREPLY_MAIL_ENCRYPTION', 'tls'),
+            'username' => env('NOREPLY_MAIL_USERNAME'),
+            'password' => env('NOREPLY_MAIL_PASSWORD'),
+            'timeout' => null,
+            'auth_mode' => null,
         ],
 
         'ses' => [
@@ -116,6 +126,6 @@ return [
     ],
 
 
-'admin_email' => env('MAIL_ADMIN', default: 'orders@alkhinjaraldhahbiantiques.com'),
+    'admin_email' => env('MAIL_ADMIN', default: 'orders@alkhinjaraldhahbiantiques.com'),
 
 ];

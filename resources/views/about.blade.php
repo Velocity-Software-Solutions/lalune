@@ -15,13 +15,12 @@
         <!-- content container -->
         <div class="relative px-6 sm:px-10 lg:px-14 py-14 lg:py-20">
             <div class="sm:max-w-[36rem] md:max-w-[20rem] lg:max-w-[42rem] xl:max-w-[54rem] pr-0 lg:pr-40">
-                <h1 class="text-5xl md:text-6xl lg:text-7xl font-bold text-white drop-shadow-sm mb-5"
-                    style="font-family:'Dancing Script', cursive;">
-                    About LaLune
+                <h1 class="text-5xl md:text-6xl lg:text-7xl font-bold text-white drop-shadow-sm mb-5">
+                    About <span style="font-family:'Dancing Script', cursive;">LaLune By NE</span>
                 </h1>
 
                 <p
-                    class="text-base md:text-lg leading-relaxed text-white/90 bg-black/10 rounded-xl p-4 md:p-5 backdrop-blur-sm">
+                    class="text-base md:text-lg leading-relaxed text-white/90 bg-black rounded-xl p-4 md:p-5 backdrop-blur-sm">
                     At La lune by NE, we believe clothing is more than what you wear – it’s how you feel. Our brand was born
                     from a love for simple, feminine, and timeless style that embraces modesty without compromising on
                     elegance.

@@ -75,13 +75,13 @@
 
   <h3 style="margin-top:1.25rem">How to Start a Return</h3>
   <ol class="steps">
-    <li>Email us at <a href="mailto:support@lalunebyne.com">support@lalunebyne.com</a> with your order number.</li>
+    <li>Email us at <a href="mailto:info@lalunebyne.com">info@lalunebyne.com</a> with your order number.</li>
     <li>Package the item securely with all tags and packing.</li>
     <li>Ship using the provided label (if applicable) or your preferred tracked carrier.</li>
     <li>We’ll process your refund or store credit once inspected (typically 3–5 business days).</li>
   </ol>
 
-  <p class="muted">Questions? Contact us at <a href="mailto:support@lalunebyne.com">support@lalunebyne.com</a>.</p>
+  <p class="muted">Questions? Contact us at <a href="mailto:info@lalunebyne.com">info@lalunebyne.com</a>.</p>
 </section>
 
 </body>

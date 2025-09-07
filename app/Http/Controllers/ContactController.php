@@ -17,7 +17,8 @@ class ContactController extends Controller
             'message' => 'required|string',
         ]);
 
-        Mail::to('info@lalunebyne.com')->send(new ContactMail($validated));
+        
+        Mail::mailer('noreply')->to('info@lalunebyne.com')->send(new ContactMail($validated));
 
         return response()->json(['ok' => true, 'message' => 'Sent'], 200);
     }

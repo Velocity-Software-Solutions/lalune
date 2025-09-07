@@ -95,7 +95,7 @@
       <p class="text-gray-700">
         If you have questions about this Privacy Policy or how we handle your information,
         please contact us at
-        <a href="mailto:support@lalunebyne.com" class="text-black font-medium underline">support@lalunebyne.com</a>.
+        <a href="mailto:info@lalunebyne.com" class="text-black font-medium underline">info@lalunebyne.com</a>.
       </p>
     </div>
 
