@@ -2,8 +2,8 @@
 
 return [
     'title'              => 'Your Shopping Cart',
-    'have_coupon'        => 'Have a coupon?',
-    'coupon_placeholder' => 'Enter coupon code',
+    'have_coupon'        => 'Have a promo code?',
+    'coupon_placeholder' => 'Enter promo code',
     'apply'              => 'Apply',
     'coupon_applied'     => 'Coupon applied:',
     'th_product'         => 'Product',

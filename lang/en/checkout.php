@@ -37,7 +37,7 @@ return [
 
     // Summary
     'subtotal'                  => 'Subtotal',
-    'coupon_discount'           => 'Coupon Discount',
+    'coupon_discount'           => 'Promo Code Discount',
     'shipping'                  => 'Shipping',
     'total'                     => 'Total',
 
