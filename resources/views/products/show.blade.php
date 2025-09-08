@@ -2,23 +2,37 @@
 
 @section('content')
     <div class="min-h-screen py-3" x-data="{ showModal: false, modalImage: '' }">
-        <div class="max-w-5xl px-4 mx-auto sm:px-6 lg:px-8">
-            <div class="grid grid-cols-1 gap-8 md:grid-cols-2 place-items-center">
-                {{-- Carousel --}}
-                <div x-data="imageCarousel(@js(
-    $product->images
+        <div x-data="productPage(@js([
+    // images: id? optional, src, alt, colorHex? (like '#000000' or null)
+    'images' => $product->images
         ->map(
             fn($img) => [
                 'src' => asset('storage/' . $img->image_path),
                 'alt' => $img->alt_text ?? __('product.image_alt'),
+                'colorHex' => $img->color_code ? strtoupper($img->color_code) : null,
             ],
         )
         ->values(),
-))" x-init="start()" class="relative w-full h-96 rounded-lg overflow-hidden"
-                    @mouseenter="paused = true; hover = true"
+    // colors: name + color_code
+    'colors' => $product->colors
+        ->map(
+            fn($c) => [
+                'name' => $c->name,
+                'hex' => strtoupper($c->color_code),
+            ],
+        )
+        ->values(),
+    // sizes: simple array of strings
+    'sizes' => $product->sizes->pluck('size')->values(),
+]))" x-init="initSelections()" class="max-w-5xl px-4 mx-auto sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 gap-8 md:grid-cols-2 place-items-center">
+
+                {{-- Carousel --}}
+                <div class="relative w-full h-96 rounded-lg overflow-hidden" @mouseenter="paused = true; hover = true"
                     @mouseleave="paused = false; hover = false; originX = 50; originY = 50">
-                    <!-- Slides -->
-                    <template x-for="(img, i) in images" :key="i">
+
+                    <!-- Slides (bind to computed displayImages) -->
+                    <template x-for="(img, i) in displayImages" :key="i">
                         <div x-show="index === i" x-transition.opacity.duration.300ms
                             class="absolute inset-0 flex items-center justify-center" @mousemove="onMove($event)">
                             <img :src="img.src" :alt="img.alt"
@@ -29,31 +43,77 @@
 
                     <!-- Dots -->
                     <div class="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-2">
-                        <template x-for="(img, i) in images" :key="i">
+                        <template x-for="(img, i) in displayImages" :key="'dot_' + i">
                             <button @click="go(i)" class="w-2.5 h-2.5 rounded-full transition"
-                                :class="i === index ? 'bg-charcoal' : 'bg-gray-300'"
-                                :aria-label="`{{ __('product.go_to_slide') }} ${i+1}`">
+                                :class="i === index ? 'bg-charcoal' : 'bg-gray-300'">
                             </button>
                         </template>
                     </div>
                 </div>
 
-                <div>
+                {{-- Right panel --}}
+                <div class="w-full">
                     <h1 class="mb-2 text-3xl montaga-semibold text-charcoal">
-                        {{ app()->getLocale() === 'ar' && $product->name_ar ? $product->name_ar : $product->name }}</h1>
+                        {{ $product->name }}
+                    </h1>
+
                     <p class="mb-4 text-lg text-gray-600">
                         {{ __('product.currency_aed') }} {{ number_format($product->price, 2) }}
                     </p>
 
                     @if ($product->description)
-                        <h2 class="mb-2 text-3xl font-bold text-charcoal">{{ __('product.description') }}</h2>
+                        <h2 class="mb-2 text-2xl font-bold text-charcoal">{{ __('product.description') }}</h2>
                         <p class="min-h-[2rem] w-full text-sm">
-                            {{ app()->getLocale() === 'ar' && $product->description_ar ? $product->description_ar : $product->description }}
+                            {{ $product->description }}
                         </p>
                     @endif
 
-                    <form action="{{ route('cart.add', $product->id) }}" method="POST">
+                    {{-- Color selector (if any) --}}
+                    <template x-if="colors.length">
+                        <div class="mt-5">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Color</label>
+                            <div class="flex flex-wrap gap-2">
+                                <template x-for="c in colors" :key="c.name + c.hex">
+                                    <button type="button" @click="selectColor(c.hex)"
+                                        class="relative inline-flex items-center gap-2 px-3 py-1.5 rounded-full border
+                             transition focus:outline-none"
+                                        :class="selectedColorHex === c.hex ? 'border-black bg-black text-white' :
+                                            'border-gray-300 bg-white'">
+                                        <span class="inline-block w-4 h-4 rounded-full border"
+                                            :style="`background:${c.hex}`"></span>
+                                        <span class="text-sm" x-text="c.name"></span>
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
+                    </template>
+
+                    {{-- Size selector (if any) --}}
+                    <template x-if="sizes.length">
+                        <div class="mt-5">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Size</label>
+                            <div class="flex flex-wrap gap-2">
+                                <template x-for="s in sizes" :key="'size_' + s">
+                                    <button type="button" @click="selectSize(s)"
+                                        class="px-4 py-1.5 rounded-full border transition"
+                                        :class="selectedSize === s ? 'border-black bg-black text-white' :
+                                            'border-gray-300 bg-white'">
+                                        <span class="text-sm" x-text="s"></span>
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
+                    </template>
+
+                    {{-- Add to cart --}}
+                    <form action="{{ route('cart.add', $product->id) }}" method="POST" class="mt-6">
                         @csrf
+
+                        {{-- Hidden fields to submit current choices --}}
+                        <input type="hidden" name="color_code" :value="selectedColorHex || ''">
+                        <input type="hidden" name="size" :value="selectedSize || ''">
+
+                        {{-- Quantity --}}
                         <div class="mb-4" x-data="{ qty: 1, maxQty: {{ $product->stock_quantity }} }">
                             <label for="quantity" class="block text-sm font-medium text-gray-700 mb-2">
                                 {{ __('product.quantity') }}
@@ -77,12 +137,11 @@
                                 </button>
                             </div>
 
-                            <p class="mt-2 text-xs text-gray-500" x-text="`Available: ${maxQty}`"></p>
+                            {{-- <p class="mt-2 text-xs text-gray-500" x-text="`Available: ${maxQty}`"></p> --}}
                         </div>
 
-
                         <button type="submit"
-                            class="px-6 py-2 text-white transition duration-200 bg-black rounded-lg hover:bg-gray-700 flex items-center justify-center gap-4">
+                            class="px-6 py-2 text-white bg-black rounded-lg hover:bg-gray-800 transition flex items-center gap-3">
                             <span class="material-icons">add_shopping_cart</span>
                             {{ __('product.add_to_cart') }}
                         </button>
@@ -148,10 +207,21 @@
         </div>
     </div>
 
+
+
     <script>
-        function imageCarousel(images = []) {
+        function productPage(init) {
             return {
-                images,
+                // data in
+                images: Array.isArray(init.images) ? init.images : [],
+                colors: Array.isArray(init.colors) ? init.colors : [],
+                sizes: Array.isArray(init.sizes) ? init.sizes : [],
+
+                // selections
+                selectedColorHex: null,
+                selectedSize: null,
+
+                // carousel state
                 index: 0,
                 paused: false,
                 hover: false,
@@ -160,9 +230,40 @@
                 originY: 50,
                 intervalId: null,
 
+                // computed: images to show based on selected color
+                get displayImages() {
+                    if (!this.selectedColorHex) return this.images;
+                    const filtered = this.images.filter(img => (img.colorHex || null) === this.selectedColorHex);
+                    return filtered.length ? filtered : this.images;
+                },
+
+                initSelections() {
+                    // auto-select color if only one
+                    if (this.colors.length === 1) {
+                        this.selectedColorHex = this.colors[0].hex;
+                    }
+                    // auto-select size if only one
+                    if (this.sizes.length === 1) {
+                        this.selectedSize = this.sizes[0];
+                    }
+                    // start carousel
+                    this.start();
+                },
+
+                selectColor(hex) {
+                    this.selectedColorHex = hex;
+                    // reset slide when color changes
+                    this.index = 0;
+                },
+
+                selectSize(size) {
+                    this.selectedSize = size;
+                },
+
+                // carousel controls (work with displayImages)
                 start() {
-                    if (this.images.length <= 1) return;
                     this.stop();
+                    if (this.displayImages.length <= 1) return;
                     this.intervalId = setInterval(() => {
                         if (!this.paused) this.next();
                     }, 5000);
@@ -174,10 +275,10 @@
                     }
                 },
                 next() {
-                    this.index = (this.index + 1) % this.images.length;
+                    this.index = (this.index + 1) % this.displayImages.length;
                 },
                 prev() {
-                    this.index = (this.index - 1 + this.images.length) % this.images.length;
+                    this.index = (this.index - 1 + this.displayImages.length) % this.displayImages.length;
                 },
                 go(i) {
                     this.index = i;
@@ -194,7 +295,7 @@
                     const scale = this.hover && active ? this.zoom : 1;
                     const origin = `${this.originX}% ${this.originY}%`;
                     return `transform-origin:${origin}; transform:scale(${scale}); transition: transform 120ms ease;`;
-                }
+                },
             }
         }
     </script>

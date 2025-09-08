@@ -18,7 +18,7 @@
     overflow-y-auto custom-scrollbar scrollbar-hide
     transform transition-transform duration-300 ease-in-out
   "
-  :class="$store.ui.sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
+  :class="$store.ui.sidebarOpen ? 'translate-x-0' : '-translate-x-[120%]'"
   x-trap.noscroll.inert="$store.ui.sidebarOpen"  {{-- optional: requires Alpine v3.13+ --}}
 >
   <div class="p-4">
@@ -59,7 +59,7 @@
                         class="flex items-center w-full gap-2 p-2 rounded-xl hover:bg-gray-300 dark:hover:bg-gray-500 group">
                         <span
                             class="text-2xl text-gray-400 transition duration-75 material-icons dark:text-gray-600 group-hover:text-gray-900 dark:group-hover:text-white">
-                            receipt_long</span>
+                            list_alt</span>
                         <span class="flex-1 ml-3 text-left whitespace-nowrap">Orders</span>
 
                     </li>
@@ -82,7 +82,7 @@
                         class="flex items-center w-full gap-2 p-2 rounded-xl hover:bg-gray-300 dark:hover:bg-gray-500 group">
                         <span
                             class="text-2xl text-gray-400 transition duration-75 material-icons dark:text-gray-600 group-hover:text-gray-900 dark:group-hover:text-white">
-                            category</span>
+                            style</span>
                         <span class="flex-1 ml-3 text-left whitespace-nowrap">Categories </span>
                     </li>
                 </a>
@@ -93,11 +93,11 @@
                     <span
                         class="text-2xl text-gray-400 transition duration-75 material-icons dark:text-gray-600 group-hover:text-gray-900 dark:group-hover:text-white">
                         redeem </span>
-                    <span class="flex-1 ml-3 text-left whitespace-nowrap">Coupons Setup </span>
+                    <span class="flex-1 ml-3 text-left whitespace-nowrap">Promo Codes</span>
                 </li>
             </a>
       
-            <a href="{{ route('admin.shipping-options.index') }}" class="w-full">
+            {{-- <a href="{{ route('admin.shipping-options.index') }}" class="w-full">
                 <li
                     class="flex items-center w-full gap-2 p-2 rounded-xl hover:bg-gray-300 dark:hover:bg-gray-500 group">
                     <span
@@ -106,7 +106,7 @@
                     <span class="flex-1 ml-3 text-left whitespace-nowrap">Shipping Options</span>
                 </li>
             </a>
-       
+        --}}
             <a href="" class="w-full">
                 <li
                     class="flex items-center w-full gap-2 p-2 rounded-xl hover:bg-gray-300 dark:hover:bg-gray-500 group">

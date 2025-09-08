@@ -96,32 +96,73 @@
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100 bg-white">
-            @foreach ($order->items as $item)
-              <tr class="text-gray-900">
-                <td class="px-5 py-4">
-                  <div class="flex items-center gap-3">
-                    {{-- Optional thumbnail if in snapshot --}}
-                    @php $thumb = data_get($item->snapshot, 'image_url'); @endphp
-                    @if($thumb)
-                      <img src="{{ $thumb }}" alt="" class="w-10 h-10 rounded object-cover ring-1 ring-gray-200">
-                    @endif
-                    <div>
-                      <div class="font-medium">
-                        {{ $item->name ?? ($item->product->name ?? __('receipt.deleted_item')) }}
-                      </div>
-                      @if($item->sku)
-                        <div class="text-xs text-gray-500">{{ __('receipt.sku') }}: {{ $item->sku }}</div>
-                      @endif
-                    </div>
-                  </div>
-                </td>
-                <td class="px-5 py-4">{{ $item->quantity }}</td>
-                <td class="px-5 py-4">{{ $currency }} {{ $fmt($item->unit_price_cents ?? ($item->price ?? 0)*100) }}</td>
-                <td class="px-5 py-4">
-                  {{ $currency }} {{ $fmt($item->total_cents ?? ($item->subtotal ?? 0)*100) }}
-                </td>
-              </tr>
-            @endforeach
+@foreach ($order->items as $item)
+  @php
+      // Try snapshot first, then fall back to item columns if present
+      $snap = (array) ($item->snapshot ?? []);
+      $thumb = $snap['image_url'] ?? null;
+
+      $colorFromSnap = $snap['color'] ?? $snap['color_code'] ?? null; // allow either key
+      $sizeFromSnap  = $snap['size']  ?? null;
+
+      $colorCode = $colorFromSnap ?: ($item->color_code ?? null);
+      $sizeVal   = $sizeFromSnap  ?: ($item->size ?? null);
+
+      // normalize hex like #AABBCC
+      if ($colorCode && !str_starts_with($colorCode, '#') && preg_match('/^[0-9A-Fa-f]{6}$/', $colorCode)) {
+          $colorCode = '#'.$colorCode;
+      }
+  @endphp
+  <tr class="text-gray-900 align-top">
+    <td class="px-5 py-4">
+      <div class="flex items-start gap-3">
+        @if($thumb)
+          <img src="{{ $thumb }}" alt="" class="w-10 h-10 rounded object-cover ring-1 ring-gray-200">
+        @endif
+        <div>
+          <div class="font-medium">
+            {{ $item->name ?? ($item->product->name ?? __('receipt.deleted_item')) }}
+          </div>
+
+          {{-- Variant badges: color + size --}}
+          @if($colorCode || $sizeVal)
+            <div class="mt-1 flex items-center gap-3 text-xs text-gray-600">
+              @if($colorCode)
+                <span class="inline-flex items-center gap-1.5">
+                  <span class="inline-block w-3.5 h-3.5 rounded-full ring-1 ring-gray-300"
+                        style="background: {{ $colorCode }};"></span>
+                  <span>
+                    {{-- Optional human name if snapshot provided it separately --}}
+                    {{ $snap['color_name'] ?? $snap['colorLabel'] ?? strtoupper($colorCode) }}
+                  </span>
+                </span>
+              @endif
+
+              @if($sizeVal)
+                <span class="inline-flex items-center px-1.5 py-0.5 rounded border border-gray-300 bg-gray-50">
+                  {{ strtoupper($sizeVal) }}
+                </span>
+              @endif
+            </div>
+          @endif
+
+          @if($item->sku)
+            <div class="text-xs text-gray-500 mt-1">{{ __('receipt.sku') }}: {{ $item->sku }}</div>
+          @endif
+        </div>
+      </div>
+    </td>
+
+    <td class="px-5 py-4 whitespace-nowrap">{{ $item->quantity }}</td>
+    <td class="px-5 py-4 whitespace-nowrap">
+      {{ $currency }} {{ $fmt($item->unit_price_cents ?? ($item->price ?? 0)*100) }}
+    </td>
+    <td class="px-5 py-4 whitespace-nowrap">
+      {{ $currency }} {{ $fmt($item->total_cents ?? ($item->subtotal ?? 0)*100) }}
+    </td>
+  </tr>
+@endforeach
+
           </tbody>
         </table>
       </div>

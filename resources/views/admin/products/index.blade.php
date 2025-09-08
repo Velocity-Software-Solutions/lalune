@@ -17,15 +17,12 @@
                 <tr>
                     <th class="px-3 py-2 text-left">#</th>
                     <th class="px-3 py-2 text-left">Name</th>
-                    <th class="px-3 py-2 text-left">Arabic Name</th>
                     <th class="px-3 py-2 text-left">SKU</th>
                     <th class="px-3 py-2 text-left">Price</th>
                     <th class="px-3 py-2 text-left">Discount</th>
                     <th class="px-3 py-2 text-left">Stock</th>
-                    <th class="px-3 py-2 text-left">Condition</th>
                     <th class="px-3 py-2 text-left">Status</th>
                     <th class="px-3 py-2 text-left">Category</th>
-                    <th class="px-3 py-2 text-left">Tags</th>
                     <th class="px-3 py-2 text-left">Actions</th>
                 </tr>
             </thead>
@@ -34,18 +31,16 @@
                     <tr class="border-b dark:border-gray-700">
                         <td class="px-3 py-2">{{ $loop->iteration }}</td>
                         <td class="px-3 py-2">{{ $product->name }}</td>
-                        <td class="px-3 py-2 text-right">{{ $product->name_ar }}</td>
                         <td class="px-3 py-2">{{ $product->sku }}</td>
-                        <td class="px-3 py-2">AED {{ number_format($product->price, 2) }}</td>
+                        <td class="px-3 py-2">{{ number_format($product->price, 2) }}</td>
                         <td class="px-3 py-2">
                             @if ($product->discount_price)
-                                AED {{ number_format($product->discount_price, 2) }}
+                                {{ number_format($product->discount_price, 2) }}
                             @else
                                 <span class="text-gray-400">—</span>
                             @endif
                         </td>
                         <td class="px-3 py-2">{{ $product->stock_quantity }}</td>
-                        <td class="px-3 py-2 capitalize">{{ $product->condition }}</td>
                         <td class="px-3 py-2">
                             <span
                                 class="inline-block px-2 py-1 text-xs font-semibold rounded 
@@ -54,7 +49,6 @@
                             </span>
                         </td>
                         <td class="px-3 py-2">{{ $product->category->name ?? '—' }}</td>
-                        <td class="px-3 py-2">{{ $product->tags ?? '—' }}</td>
                         <td class="px-3 py-2 flex space-x-2">
                             <a href="{{ route('admin.products.edit', $product->id) }}"
                                 class="text-blue-600 hover:underline">Edit</a>

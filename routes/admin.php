@@ -23,7 +23,7 @@ Route::middleware(['auth', IsAdmin::class])->group(function () {
     Route::resource('categories', CategoryController::class);
     Route::resource('products', ProductController::class);
     Route::resource('coupons', CouponController::class);
-    Route::resource('shipping-options', ShippingOptionController::class);
+    // Route::resource('shipping-options', ShippingOptionController::class);
     Route::resource('orders', OrderController::class);
     Route::post('/product/image/delete', [ProductController::class, 'deleteImage'])->name('product.image.delete');
 

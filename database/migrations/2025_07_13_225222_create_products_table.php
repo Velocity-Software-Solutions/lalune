@@ -15,17 +15,15 @@ return new class extends Migration {
         Schema::create('products', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->string('name_ar');
             $table->string('slug')->unique();
             $table->string('sku')->unique();
             $table->text('description')->nullable();
-            $table->text('description_ar')->nullable();
             $table->decimal('price');
             $table->decimal('discount_price')->nullable();
             $table->integer('stock_quantity');
             $table->boolean('status');
             $table->foreignId('category_id')->constrained()->on('categories')->onDelete('cascade');
-            $table->foreignId('collection_id')->constrained()->on('cellections')->onDelete('cascade');
+            $table->foreignId('collection_id')->constrained()->on('collections')->onDelete('cascade');
             $table->timestamps();
 
         });

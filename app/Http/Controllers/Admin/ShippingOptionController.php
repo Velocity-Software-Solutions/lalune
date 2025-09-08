@@ -13,8 +13,8 @@ class ShippingOptionController extends Controller
      */
     public function index()
     {
-        $ShippingOption = ShippingOption::where('status', 1)->with('cities')->latest()->paginate(10);
-        return view('admin.shipping-options', compact('ShippingOption'));
+        $shippingOptions = ShippingOption::where('status', 1)->with('cities')->latest()->paginate(10);
+        return view('admin.shipping-options', compact('shippingOptions'));
     }
 
     /**

@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Barryvdh\DomPDF\Facade\Pdf; // at the top of the file
 use Stripe\StripeClient;
+use User;
 
 
 class CheckoutController extends Controller
@@ -283,13 +284,18 @@ class CheckoutController extends Controller
             }
         }
 
-        $itemsSnapshot = collect($lineItems->data)->map(fn($li) => [
-            'description' => $li->description,
-            'quantity' => (int) ($li->quantity ?? 1),
-            'amount_total' => (int) ($li->amount_total ?? 0),
-            'amount_subtotal' => (int) ($li->amount_subtotal ?? 0),
-            'currency' => strtoupper($li->currency ?? $currency),
-        ])->all();
+$itemsSnapshot = collect($lineItems->data)->map(fn($li) => [
+    'description'      => $li->description,
+    'quantity'         => (int) ($li->quantity ?? 1),
+    'amount_total'     => (int) ($li->amount_total ?? 0),
+    'amount_subtotal'  => (int) ($li->amount_subtotal ?? 0),
+    'currency'         => strtoupper($li->currency ?? $currency),
+
+    // New: variant details if stored in metadata
+    'color'            => $li->price->product->metadata['color'] ?? null,
+    'size'             => $li->price->product->metadata['size'] ?? null,
+])->all();
+
 
         $order = Order::firstOrCreate(
             ['stripe_session_id' => $sessionId],

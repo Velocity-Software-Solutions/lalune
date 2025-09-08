@@ -14,36 +14,54 @@ class CartController extends Controller
         return view('cart.index');
     }
 
-    public function add(Request $request, $id)
-    {
-        $product = Product::with('images')->findOrFail($id);
-        $thumbnail = $product->images->first();
-        $cart = session()->get('cart', []);
+public function add(Request $request, $id)
+{
+    $product = Product::with('images')->findOrFail($id);
 
-        if (isset($cart[$id])) {
-            $cart[$id]['quantity'] += 1;
-        } else {
-            $cart[$id] = [
-                "name" => $product->name,
-                "price" => $product->price,
-                "image_path" => $thumbnail->image_path,
-                "quantity" => 1,
-            ];
-        }
+    // Read selected options from form
+    $selectedColor = $request->input('color_code'); // e.g. "#000000"
+    $selectedSize  = $request->input('size');       // e.g. "M"
 
+    // Choose a thumbnail (either color-matched or fallback to first)
+    $thumbnail = $product->images
+        ->firstWhere('color_code', $selectedColor)
+        ?? $product->images->first();
+
+    // Build a unique key for this cart item
+    $cartKey = $id . '|' . ($selectedColor ?: 'any') . '|' . ($selectedSize ?: 'any');
+
+    $cart = session()->get('cart', []);
+
+    if (isset($cart[$cartKey])) {
+        $cart[$cartKey]['quantity'] += (int) $request->input('quantity', 1);
+    } else {
+        $cart[$cartKey] = [
+            "product_id" => $id,
+            "name"       => $product->name,
+            "price"      => $product->price,
+            "image_path" => $thumbnail?->image_path,
+            "quantity"   => (int) $request->input('quantity', 1),
+            "color"      => $selectedColor,
+            "size"       => $selectedSize,
+        ];
+    }
+
+    session()->put('cart', $cart);
+    return redirect()->route('cart.index')->with('success', 'Product added to cart!');
+}
+
+public function update(Request $request, $cartKey)
+{
+    $cart = session()->get('cart', []);
+
+    if (isset($cart[$cartKey])) {
+        $cart[$cartKey]['quantity'] = max(1, (int) $request->quantity);
         session()->put('cart', $cart);
-        return redirect()->route('cart.index')->with('success', 'Product added to cart!');
     }
 
-    public function update(Request $request, $id)
-    {
-        $cart = session()->get('cart', []);
-        if (isset($cart[$id])) {
-            $cart[$id]['quantity'] = (int) $request->quantity;
-            session()->put('cart', $cart);
-        }
-        return redirect()->route('cart.index');
-    }
+    return redirect()->route('cart.index');
+}
+
 
     public function remove($id)
     {

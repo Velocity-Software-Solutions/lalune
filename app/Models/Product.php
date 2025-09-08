@@ -12,15 +12,12 @@ class Product extends Model
 {
     protected $fillable = [
         'name',
-        'name_ar',
         'slug',
         'sku',
         'description',
-        'description_ar',
         'price',
         'discount_price',
         'stock_quantity',
-        'condition',
         'status',
         'category_id',
         'collection_id'
@@ -43,9 +40,17 @@ class Product extends Model
         return $this->belongsTo(Category::class);
     }
 
-        public function collection()
+    public function collection()
     {
         return $this->belongsTo(Collection::class);
     }
 
+    public function sizes()
+    {
+        return $this->hasMany(ProductSize::class);
+    }
+    public function colors()
+    {
+        return $this->hasMany(ProductColor::class);
+    }
 }
