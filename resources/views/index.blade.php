@@ -6,25 +6,29 @@
 
 @section('content')
 @php
-  // Flatten your grouped $products (['Category' => Collection<Product>]) to a simple array
+  // Flatten your grouped $products (['Category Label' => Collection<Product>]) to a simple array
   $productsFlat = collect($products)->flatMap(function ($group, $label) {
       return collect($group)->map(function ($p) use ($label) {
           return [
-              'id' => $p->id,
-              'name' => $p->name,
-              'description' => $p->description,
-              'price' => (float) $p->price,
+              'id'             => $p->id,
+              'name'           => $p->name,
+              'description'    => $p->description,
+              'price'          => (float) $p->price,
               'discount_price' => $p->discount_price ? (float) $p->discount_price : null,
-              'images' => $p->images->take(3)->map(fn($i) => ['path' => $i->image_path])->values(),
+              'images'         => $p->images->take(3)->map(fn($i) => ['path' => $i->image_path])->values(),
               'category_label' => $label,
-              'category_slug' => \Illuminate\Support\Str::slug($label),
+              'category_id'    => $p->category_id,   // 👈 use ID everywhere
           ];
       });
   })->values();
 
-  // Build category dropdown options from the same grouping
-  $categoryOptions = collect(array_keys($products->toArray()))
-      ->map(fn($label) => ['slug' => \Illuminate\Support\Str::slug($label), 'label' => $label])
+  // Build category dropdown options as { id, label }
+  $categoryOptions = collect($products)
+      ->map(fn($group, $label) => [
+          'id'    => optional($group->first())->category_id, // safe if empty
+          'label' => $label,
+      ])
+      ->filter(fn($c) => !is_null($c['id']))
       ->values();
 @endphp
 
@@ -74,8 +78,8 @@
       <select x-model="category"
               class="mt-1 mb-4 w-full rounded-lg border-gray-300 focus:border-black focus:ring-black">
         <option value="">All</option>
-        <template x-for="c in categories" :key="c.slug">
-          <option :value="c.slug" x-text="c.label"></option>
+        <template x-for="c in categories" :key="c.id">
+          <option :value="String(c.id)" x-text="c.label"></option>
         </template>
       </select>
 
@@ -108,11 +112,11 @@
     </div>
 
     <!-- Grouped sections -->
-    <template x-for="section in grouped" :key="section.label">
+    <template x-for="section in grouped" :key="section.id ?? section.label">
       <div class="mb-10">
         <div class="flex items-center justify-between mb-3 sm:mb-4 mt-4">
           <h3 class="text-2xl sm:text-3xl font-bold text-black" x-text="section.label"></h3>
-          <a :href="viewAllUrl(section.slug)" class="text-sm text-gray-700 hover:text-black">View all →</a>
+          <a :href="viewAllUrl(section.id)" class="text-sm text-gray-700 hover:text-black">View all →</a>
         </div>
 
         <div class="grid grid-cols-1 gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3 border-b border-black/10 pb-8">
@@ -213,7 +217,7 @@ function page(products = [], categories = [], storageBase = ''){
     products,
     categories,
     q: new URLSearchParams(location.search).get('q') || '',
-    category: new URLSearchParams(location.search).get('category') || '',
+    category: new URLSearchParams(location.search).get('category') || '', // stores ID as string
     sort: new URLSearchParams(location.search).get('sort') || 'latest',
     justFiltered: false,
 
@@ -231,7 +235,8 @@ function page(products = [], categories = [], storageBase = ''){
       }
 
       if (this.category) {
-        list = list.filter(p => p.category_slug === this.category);
+        // compare as strings to avoid type issues
+        list = list.filter(p => String(p.category_id) === String(this.category));
       }
 
       switch (this.sort) {
@@ -257,10 +262,10 @@ function page(products = [], categories = [], storageBase = ''){
     get grouped(){
       const map = new Map();
       for (const p of this.filtered) {
-        const key = p.category_label || 'Uncategorized';
-        const slug = p.category_slug || 'uncategorized';
-        if (!map.has(key)) map.set(key, { label: key, slug, items: [] });
-        map.get(key).items.push(p);
+        const label = p.category_label || 'Uncategorized';
+        const id    = p.category_id ?? null;
+        if (!map.has(label)) map.set(label, { label, id, items: [] });
+        map.get(label).items.push(p);
       }
       return Array.from(map.values());
     },
@@ -294,9 +299,9 @@ function page(products = [], categories = [], storageBase = ''){
       // Uses your named route products.show
       return `{{ route('products.show', 0) }}`.replace('/0', `/${id}`);
     },
-    viewAllUrl(slug){
-      const u = new URL(`{{ route('products.index') }}`);
-      if (slug) u.searchParams.set('category', slug);
+    viewAllUrl(categoryId){
+      const u = new URL(`{{ route('products.index') }}`); // expects an index that can accept ?category=
+      if (categoryId) u.searchParams.set('category', String(categoryId));
       return u.toString();
     }
   }

@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\Session;
 Route::get('/', [StoreController::class, 'home'])->name('home');
 
 // Product listing & details
-Route::get('/products', [ProductController::class, 'index'])->name('products.index');   // Show all products
+Route::get('/products', [ProductController::class, 'index'])->name('products.index');
 Route::get('/products/{id}', [ProductController::class, 'show'])->name('products.show'); // Show single product
 
 // Collections 
