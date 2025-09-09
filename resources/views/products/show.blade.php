@@ -101,6 +101,10 @@
                                         <span class="text-sm" x-text="s"></span>
                                     </button>
                                 </template>
+                                <button type="button" @click="showModal = true; modalImage = '{{ asset('images/size-chart.jpeg') }}'"
+                                    class="px-4 py-1.5 rounded-full border-2 transition hover:border-black">
+                                    <span class="text-sm">Size Chart</span>
+                                </button>
                             </div>
                         </div>
                     </template>
@@ -193,15 +197,15 @@
         </div>
         <div x-show="showModal" x-transition x-cloak
             class="fixed inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center p-4"
-            @click.away="showModal = false" @keydown.escape.window="showModal = false" role="dialog"
+             @keydown.escape.window="showModal = false" role="dialog"
             :aria-label="`{{ __('shop.image_preview') }}`">
             <div class="relative max-w-full max-h-screen">
-                <button @click="showModal = false"
+                {{-- <button @click="showModal = false"
                     class="absolute -top-4 -right-4 flex justify-center items-center bg-white text-black text-2xl w-8 h-8 rounded-full shadow hover:bg-gray-100 z-50"
                     aria-label="{{ __('shop.close') }}">
                     <span class="material-icons">close</span>
-                </button>
-                <img :src="modalImage" class="max-w-full max-h-[90vh] rounded shadow-xl"
+                </button> --}}
+                <img @click.outside="showModal = false" :src="modalImage" class="max-w-full max-h-[90vh] rounded shadow-xl"
                     :alt="`{{ __('shop.image_preview') }}`">
             </div>
         </div>
