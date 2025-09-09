@@ -12,16 +12,19 @@ class CollectionController extends Controller
     public function index()
     {
         $products = Product::with(['images', 'collection'])
+            ->whereHas('collection', function ($q) {
+                $q->where('status', 1);
+            })
             ->latest()
             ->get()
             ->groupBy(function ($p) {
                 if (!$p->collection) {
                     return 'Uncategorized';
                 }
-
-                // Otherwise fall back to default name
                 return $p->collection->name ?? 'Uncategorized';
             });
+
         return view('collections', compact('products'));
+
     }
 }

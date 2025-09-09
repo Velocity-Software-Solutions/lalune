@@ -11,6 +11,9 @@ class StoreController extends Controller
         $locale = app()->getLocale();
 
         $products = Product::with(['images', 'category'])
+                    ->whereHas('category', function ($q) {
+                $q->where('status', 1);
+            })
             ->latest()
             ->get()
             ->groupBy(function ($p) use ($locale) {
