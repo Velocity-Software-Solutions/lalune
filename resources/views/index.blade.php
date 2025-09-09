@@ -6,7 +6,7 @@
 
 @section('content')
     @php
-        // Flatten your grouped $products (['Category Label' => Collection<Product>]) to a simple array
+        // Flatten your grouped products to a simple array
         $productsFlat = collect($products)
             ->flatMap(function ($group, $label) {
                 return collect($group)->map(function ($p) use ($label) {
@@ -18,46 +18,60 @@
                         'discount_price' => $p->discount_price ? (float) $p->discount_price : null,
                         'images' => $p->images->take(3)->map(fn($i) => ['path' => $i->image_path])->values(),
                         'category_label' => $label,
-                        'category_id' => $p->category_id, // 👈 use ID everywhere
+                        'category_id' => $p->category_id,
+
+                        // NEW: product sizes as array of strings
+                        // If your field is not "name", change to ->pluck('value') etc.
+                        'sizes' => $p->sizes?->pluck('size')->filter()->values()->all() ?? [],
                     ];
                 });
             })
             ->values();
 
-        // Build category dropdown options as { id, label }
+        // Category dropdown options as { id, label }
         $categoryOptions = collect($products)
             ->map(
                 fn($group, $label) => [
-                    'id' => optional($group->first())->category_id, // safe if empty
+                    'id' => optional($group->first())->category_id,
                     'label' => $label,
                 ],
             )
             ->filter(fn($c) => !is_null($c['id']))
+            ->values();
+
+        // NEW: Size options (unique + sorted, e.g., ["XS","S","M","L","XL"])
+        $sizeOptions = collect($productsFlat)
+            ->pluck('sizes') // [[...], [...], ...]
+            ->flatten()
+            ->filter()
+            ->unique()
+            ->sort()
             ->values();
     @endphp
 
     <div x-data="page(
         @js($productsFlat),
         @js($categoryOptions),
-        @js(asset('storage'))
+        @js(asset('storage')),
+        @js($sizeOptions)
     )" class="relative min-h-screen bg-gray-50">
 
         <!-- Fixed Filter button (bottom-right) -->
         <div class="flex justify-evenly gap-4 fixed bottom-4 right-4 z-40">
-                <button @click="showModal = true; modalImage = '{{ asset('images/size-chart.jpeg') }}'"
-            class="px-5 py-3 rounded-full shadow-lg
+            <button @click="showModal = true; modalImage = '{{ asset('images/size-chart.jpeg') }}'"
+                class="px-5 py-3 rounded-full shadow-lg
                  bg-gradient-to-r from-black via-neutral-700 to-black
                  text-white font-medium
                  bg-[length:200%_100%] bg-left hover:bg-right transition-all duration-500">
-            Size Chart
-        </button>
-        <button @click="drawerOpen = true"
-            class="px-5 py-3 rounded-full shadow-lg
+                Size Chart
+            </button>
+            <button @click="drawerOpen = true"
+                class="px-5 py-3 rounded-full shadow-lg
                  bg-gradient-to-r from-black via-neutral-700 to-black
                  text-white font-medium
                  bg-[length:200%_100%] bg-left hover:bg-right transition-all duration-500">
-            Filter
-        </button>
+                Filter
+            </button>
         </div>
 
 
@@ -93,6 +107,20 @@
                         <option :value="String(c.id)" x-text="c.label"></option>
                     </template>
                 </select>
+                <!-- Size (multi-select) -->
+                <label class="block text-sm font-medium text-gray-700">Size</label>
+                <div class="mt-2 mb-4 grid grid-cols-5 gap-2">
+                    <template x-for="s in sizesAll" :key="s">
+                        <label class="inline-flex items-center gap-2 text-sm">
+                            <input type="checkbox" class="rounded border-gray-300 text-black focus:ring-black"
+                                :value="s" x-model="sizesSelected">
+                            <span x-text="s"></span>
+                        </label>
+                    </template>
+                    <template x-if="sizesAll.length === 0">
+                        <span class="col-span-3 text-xs text-gray-500">No sizes available</span>
+                    </template>
+                </div>
 
                 <!-- Sort -->
                 <label class="block text-sm font-medium text-gray-700">Sort by</label>
@@ -214,7 +242,7 @@
     </div>
 
     <script>
-        function page(products = [], categories = [], storageBase = '') {
+        function page(products = [], categories = [], storageBase = '', sizeOptions = []) {
             return {
                 // state
                 drawerOpen: false,
@@ -223,9 +251,18 @@
                 storageBase,
                 products,
                 categories,
+                sizesAll: sizeOptions, // NEW: all available sizes
+
                 q: new URLSearchParams(location.search).get('q') || '',
-                category: new URLSearchParams(location.search).get('category') || '', // stores ID as string
+                category: new URLSearchParams(location.search).get('category') || '',
                 sort: new URLSearchParams(location.search).get('sort') || 'latest',
+
+                // NEW: selected sizes from URL param (?sizes=M,L)
+                sizesSelected: (() => {
+                    const raw = new URLSearchParams(location.search).get('sizes') || '';
+                    return raw ? raw.split(',').map(s => s.trim()).filter(Boolean) : [];
+                })(),
+
                 justFiltered: false,
 
                 // computed
@@ -242,8 +279,13 @@
                     }
 
                     if (this.category) {
-                        // compare as strings to avoid type issues
                         list = list.filter(p => String(p.category_id) === String(this.category));
+                    }
+
+                    // NEW: size filtering (keep products that have ANY selected size)
+                    if (this.sizesSelected.length > 0) {
+                        const set = new Set(this.sizesSelected.map(s => s.toLowerCase()));
+                        list = list.filter(p => (p.sizes || []).some(sz => set.has(String(sz).toLowerCase())));
                     }
 
                     switch (this.sort) {
@@ -260,7 +302,6 @@
                             break;
                         case 'latest':
                         default:
-                            // keep order as provided
                             break;
                     }
 
@@ -286,17 +327,28 @@
                 apply() {
                     this.justFiltered = true;
                     setTimeout(() => this.justFiltered = false, 1200);
+
                     // Sync URL (no reload)
                     const u = new URL(location);
                     this.q ? u.searchParams.set('q', this.q) : u.searchParams.delete('q');
                     this.category ? u.searchParams.set('category', this.category) : u.searchParams.delete('category');
                     this.sort ? u.searchParams.set('sort', this.sort) : u.searchParams.delete('sort');
+
+                    // NEW: sizes -> comma-separated
+                    if (this.sizesSelected.length) {
+                        u.searchParams.set('sizes', this.sizesSelected.join(','));
+                    } else {
+                        u.searchParams.delete('sizes');
+                    }
+
                     history.replaceState({}, '', u);
                 },
+
                 reset() {
                     this.q = '';
                     this.category = '';
                     this.sort = 'latest';
+                    this.sizesSelected = []; // NEW
                     this.apply();
                 },
 
@@ -312,14 +364,13 @@
                     return Math.round(((p.price - p.discount_price) / p.price) * 100);
                 },
                 productUrl(id) {
-                    // Uses your named route products.show
                     return `{{ route('products.show', 0) }}`.replace('/0', `/${id}`);
                 },
                 viewAllUrl(categoryId) {
-                    const u = new URL(`{{ route('products.index') }}`); // expects an index that can accept ?category=
+                    const u = new URL(`{{ route('products.index') }}`);
                     if (categoryId) u.searchParams.set('category', String(categoryId));
                     return u.toString();
-                }
+                },
             }
         }
     </script>
