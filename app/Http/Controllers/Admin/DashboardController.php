@@ -13,27 +13,28 @@ class DashboardController extends Controller
 
 public function index()
 {
-    $now   = now();
-    $from30 = $now->copy()->subDays(30);
-    $from7  = $now->copy()->subDays(7);
+    $now      = now();
+    $from30   = $now->copy()->subDays(30);
+    $from7    = $now->copy()->subDays(7);
 
-    // ===== KPIs
+    // ===== KPIs (uses payment_status + *_cents)
     $kpis = [
         'sales_30d'     => (float) Order::paid()
                                 ->whereBetween('created_at', [$from30, $now])
-                                ->sum('grand_total'),
+                                ->sum('total_cents') / 100, // convert cents → major unit
         'orders_today'  => (int) Order::whereDate('created_at', $now->toDateString())->count(),
-        'pending_count' => (int) Order::where('status', 'pending')->count(),
-        'refunds_30d'   => (int) Order::where('status', 'refunded')
+        'pending_count' => (int) Order::where('order_status', 'pending')->count(),
+        'refunds_30d'   => (int) Order::where('order_status', 'refunded')
                                 ->whereBetween('updated_at', [$from30, $now])
-                                ->count(), // or your Refund model if you have one
+                                ->count(),
     ];
 
-    // ===== Orders last 30 days (chart)
+    // ===== Orders last 30 days (chart) — count of PAID orders per day
     $rows = Order::paid()
-        ->selectRaw('DATE(created_at) d, COUNT(*) c')
+        ->selectRaw('DATE(created_at) as d, COUNT(*) as c')
         ->whereBetween('created_at', [$from30->toDateString(), $now->toDateString()])
-        ->groupBy('d')->orderBy('d')->pluck('c','d');
+        ->groupBy('d')->orderBy('d')
+        ->pluck('c', 'd'); // ['YYYY-MM-DD' => N]
 
     $labels = [];
     $data   = [];
@@ -44,50 +45,56 @@ public function index()
     }
     $ordersSeries = ['labels' => $labels, 'data' => $data];
 
-    // ===== Pending orders table (use order billing/shipping fields)
-    // Adjust field names to yours: billing_name, billing_email, etc.
-    $pendingOrders = Order::where('status','pending')
-        ->latest()->take(100)
+    // ===== Pending orders table (map to your columns)
+    // - uses: order_number, full_name, email, payment_method, total_cents
+    // - uses withCount('items') to avoid N+1
+    $pendingOrders = Order::where('order_status', 'pending')
+        ->withCount('items')
+        ->latest()
+        ->take(100)
         ->get()
-        ->map(function($o){
+        ->map(function ($o) {
             return [
                 'id'             => $o->id,
-                'order_number'   => $o->number,             // adjust
-                'customer_name'  => $o->billing_name ?? '—',// adjust
-                'customer_email' => $o->billing_email ?? '—',// adjust
-                'items_count'    => (int) ($o->items_count ?? $o->items()->count()),
-                'total'          => (float) $o->grand_total,
+                'order_number'   => $o->order_number,
+                'customer_name'  => $o->full_name ?? '—',
+                'customer_email' => $o->email ?? '—',
+                'items_count'    => (int) ($o->items_count ?? 0),
+                'total'          => (float) ($o->total_cents / 100),  // number for frontend formatting
                 'payment_method' => $o->payment_method ?? '—',
-                'placed'         => $o->created_at->format('M d, Y'),
+                'placed'         => optional($o->created_at)->format('M d, Y'),
             ];
-        })->all();
+        })
+        ->all();
 
     // ===== Insights
-    // NEW customers = distinct emails whose FIRST order happened in the last 7 days
-    // (ignores null/empty emails)
-    $newCustomers7d = DB::table('orders')
-        ->whereNotNull('billing_email')
-        ->where('billing_email','<>','')
-        ->selectRaw('LOWER(billing_email) as email, MIN(created_at) as first_at')
-        ->groupBy('email')
-        ->havingBetween('first_at', [$from7, $now])
+    // New customers = distinct emails whose FIRST order (any status) happened in last 7 days
+    // (emails normalized to lowercase; ignore null/empty)
+    $firstOrdersSub = DB::table('orders')
+        ->whereNotNull('email')->where('email', '<>', '')
+        ->selectRaw('LOWER(email) as email, MIN(created_at) as first_at')
+        ->groupBy('email');
+
+    $newCustomers7d = DB::query()
+        ->fromSub($firstOrdersSub, 't')
+        ->whereBetween('first_at', [$from7, $now])
         ->count();
 
-    // Low stock as before (optional)
+    // Low stock (simple numeric threshold = 5 units)
     $lowStockNames = Product::select('name')
-        ->whereColumn('stock','<=','10')
-        ->orderBy('stock')->limit(5)->pluck('name')->all();
+        ->where('stock_quantity', '<=', 5)
+        ->orderBy('stock_quantity')
+        ->limit(5)
+        ->pluck('name')
+        ->all();
 
     $insights = [
         'low_stock'               => $lowStockNames,
         'low_stock_count'         => count($lowStockNames),
         'new_customers_7d'        => $newCustomers7d,
-        // Abandoned checkouts come from browser storage; server can’t know it:
-        'abandoned_checkouts_7d'  => null, // will be filled on the client
+        'abandoned_checkouts_7d'  => null, // stays client-side via localStorage
     ];
 
-    return view('admin.dashboard', compact('kpis','ordersSeries','pendingOrders','insights'));
+    return view('admin.dashboard', compact('kpis', 'ordersSeries', 'pendingOrders', 'insights'));
 }
-
-
 }

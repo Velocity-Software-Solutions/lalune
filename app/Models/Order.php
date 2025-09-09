@@ -91,4 +91,11 @@ class Order extends Model
     {
         return $this->subtotal_cents / 100;
     }
+
+        // Scope for "paid" orders
+public function scopePaid($query)
+{
+    return $query->where('payment_status', 'paid');
+}
+
 }
