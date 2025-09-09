@@ -33,8 +33,7 @@ class Product extends Model
     {
         return $this->hasMany(ProductImage::class)->orderByDesc('thumbnail')->first();
     }
-
-
+    
     public function category()
     {
         return $this->belongsTo(Category::class);

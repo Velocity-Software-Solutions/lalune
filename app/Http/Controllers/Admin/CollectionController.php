@@ -3,18 +3,17 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Category;
+use App\Models\Collection;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
-
-class CategoryController extends Controller
+class CollectionController extends Controller
 {
-    public function index()
+        public function index()
     {
-        $categories = Category::where('status',1)->paginate(10);
-        $categories_count = $categories->count();
+        $collections = Collection::where('status',1)->paginate(10);
+        $collections_count = $collections->count();
 
-        return view('admin.categories', compact('categories', 'categories_count'));
+        return view('admin.collections', compact('collections', 'collections_count'));
     }
 
     public function store(Request $request)
@@ -28,15 +27,15 @@ class CategoryController extends Controller
             return redirect()->back()
                 ->withErrors($validator)
                 ->withInput()
-                ->with('category_id', null); // No ID since it's a new row
+                ->with('collection_id', null); // No ID since it's a new row
         }
 
-        Category::create([
+        Collection::create([
             'name' => $request->name,
             'slug' => $request->slug,
         ]);
 
-        return redirect()->back()->with('success', 'Category added successfully.');
+        return redirect()->back()->with('success', 'Collection added successfully.');
     }
 
     public function update(Request $request, string $id)
@@ -53,23 +52,23 @@ class CategoryController extends Controller
             return redirect()->back()
                 ->withErrors($validator)
                 ->withInput()
-                ->with('category_id', $id);
+                ->with('collection_id', $id);
         }
 
-        $category = Category::findOrFail($id);
-        $category->name = $request->input($fieldName);
-        $category->slug = $request->input($fieldSlug);
-        $category->save();
-        return redirect()->back()->with('success', 'Category updated successfully.');
+        $collection = Collection::findOrFail($id);
+        $collection->name = $request->input($fieldName);
+        $collection->slug = $request->input($fieldSlug);
+        $collection->save();
+        return redirect()->back()->with('success', 'Collection updated successfully.');
     }
 
     public function destroy(string $id)
     {
-        $category = Category::findOrFail($id);
-        $category->status = 0;
+        $collection = Collection::findOrFail($id);
+        $collection->status = 0;
 
-        $category->save();
+        $collection->save();
 
-        return redirect()->back()->with('success', 'Category deleted.');
+        return redirect()->back()->with('success', 'Collection deleted.');
     }
 }

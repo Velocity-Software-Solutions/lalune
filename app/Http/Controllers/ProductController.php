@@ -13,13 +13,11 @@ public function index(Request $request)
     $categoryId = $request->query('category');
 
     if (!$categoryId) {
-        return "hello";
         return redirect()->route('home');
     }
 
     $category = Category::find($categoryId);
     if (!$category) {
-        return "hi";
         return redirect()->route('home');
     }
 

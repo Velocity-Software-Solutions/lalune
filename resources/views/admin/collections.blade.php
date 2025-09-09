@@ -1,15 +1,15 @@
 @extends('layouts.admin')
 
-@section('title', 'Categories')
+@section('title', 'Collections')
 
 @section('content')
     <div class="max-w-6xl p-6 mx-2 h-full space-y-6 bg-white rounded-md shadow-md w-9/10 dark:bg-gray-800"
         x-data="{ showNewRow: false, showError: {{ $errors->has('name') ? 'true' : 'false' }} }">
         {{-- Header --}}
         <div class="flex items-center justify-between mb-6">
-            <h2 class="text-2xl font-bold text-gray-800 dark:text-white">Categories</h2>
+            <h2 class="text-2xl font-bold text-gray-800 dark:text-white">Collections</h2>
             <button @click="showNewRow = true" class="px-4 py-2 text-white bg-blue-600 rounded hover:bg-blue-700">
-                + Add Category
+                + Add Collection
             </button>
         </div>
 
@@ -38,7 +38,7 @@
                 <thead class="text-gray-700 bg-gray-100 dark:bg-gray-700 dark:text-white">
                     <tr>
                         <th class="px-5 py-3 text-left">#</th>
-                        <th class="px-5 py-3 text-left">Category Name</th>
+                        <th class="px-5 py-3 text-left">Collection Name</th>
                         <th class="px-5 py-3 text-left">Slug</th>
                         <th class="px-5 py-3 text-center">Actions</th>
                     </tr>
@@ -49,12 +49,12 @@
 
 
                     <tr x-show="showNewRow || showError" class="bg-gray-50 dark:bg-gray-900">
-                        <form action="{{ route('admin.categories.store') }}" method="POST"
+                        <form action="{{ route('admin.collections.store') }}" method="POST"
                             class="flex items-center w-full">
                             @csrf
                             <td class="px-5 py-2 text-gray-700 dark:text-white">New</td>
                             <td class="w-auto px-5 py-2">
-                                <input name="name" placeholder="Enter category name" value="{{ old('name') }}"
+                                <input name="name" placeholder="Enter collection name" value="{{ old('name') }}"
                                     class="w-44 text-sm rounded-md form-input" />
 
                                 @error('name')
@@ -62,7 +62,7 @@
                                 @enderror
                             </td>
                             <td class="w-auto px-5 py-2">
-                                <input name="slug" placeholder="Enter category slug" value="{{ old('slug') }}"
+                                <input name="slug" placeholder="Enter collection slug" value="{{ old('slug') }}"
                                     class="w-44 text-sm rounded-md form-input" />
 
                                 @error('slug')
@@ -85,26 +85,26 @@
                     </tr>
 
 
-                    {{-- Existing Categories --}}
-                    @foreach ($categories as $category)
-                        <form action="{{ route('admin.categories.update', $category->id) }}" method="POST">
+                    {{-- Existing Collections --}}
+                    @foreach ($collections as $collection)
+                        <form action="{{ route('admin.collections.update', $collection->id) }}" method="POST">
                             @csrf
                             @method('PUT')
                             <tr>
                                 <td class="px-5 py-2 text-gray-700 dark:text-white">{{ $loop->iteration }}</td>
                                 <td class="w-auto px-5 py-2">
-                                    <input name="name_{{ $category->id }}"
-                                        value="{{ old('name_' . $category->id, $category->name) }}"
+                                    <input name="name_{{ $collection->id }}"
+                                        value="{{ old('name_' . $collection->id, $collection->name) }}"
                                         class="w-44 text-sm rounded-md form-input" />
-                                    @error('name_' . $category->id)
+                                    @error('name_' . $collection->id)
                                         <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
                                     @enderror
                                 </td>
                                 <td class="w-auto px-5 py-2">
-                                    <input name="slug_{{ $category->id }}"
-                                        value="{{ old('slug_' . $category->id, $category->slug) }}"
+                                    <input name="slug_{{ $collection->id }}"
+                                        value="{{ old('slug_' . $collection->id, $collection->slug) }}"
                                         class="w-44 text-sm rounded-md form-input" />
-                                    @error('slug_' . $category->id)
+                                    @error('slug_' . $collection->id)
                                         <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
                                     @enderror
                                 </td>
@@ -119,8 +119,8 @@
                                         </svg>
                                     </button>
                         </form>
-                        <form action="{{ route('admin.categories.destroy', $category->id) }}" method="POST"
-                            onsubmit="return confirm('Are you sure you want to delete this category?');">
+                        <form action="{{ route('admin.collections.destroy', $collection->id) }}" method="POST"
+                            onsubmit="return confirm('Are you sure you want to delete this collection?');">
                             @csrf
                             @method('DELETE')
                             <button type="submit" class="px-2 py-1 text-xs text-white bg-red-500 rounded hover:bg-red-600">
@@ -142,7 +142,7 @@
 
         {{-- Pagination --}}
         <div class="flex justify-end mt-6">
-            {{ $categories->links('pagination::tailwind') }}
+            {{ $collections->links('pagination::tailwind') }}
         </div>
     </div>
 @endsection

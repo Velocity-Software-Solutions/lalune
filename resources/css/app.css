@@ -118,6 +118,8 @@
   }
 }
 
+[x-cloak] { display: none !important; }
+
 /* Top-left corner */
 /* .product-box::before {
   content: "";
