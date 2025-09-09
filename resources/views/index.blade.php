@@ -43,13 +43,23 @@
     )" class="relative min-h-screen bg-gray-50">
 
         <!-- Fixed Filter button (bottom-right) -->
+        <div class="flex justify-evenly gap-4 fixed bottom-4 right-4 z-40">
+                <button @click="showModal = true; modalImage = '{{ asset('images/size-chart.jpeg') }}'"
+            class="px-5 py-3 rounded-full shadow-lg
+                 bg-gradient-to-r from-black via-neutral-700 to-black
+                 text-white font-medium
+                 bg-[length:200%_100%] bg-left hover:bg-right transition-all duration-500">
+            Size Chart
+        </button>
         <button @click="drawerOpen = true"
-            class="fixed bottom-4 right-4 z-40 px-5 py-3 rounded-full shadow-lg
+            class="px-5 py-3 rounded-full shadow-lg
                  bg-gradient-to-r from-black via-neutral-700 to-black
                  text-white font-medium
                  bg-[length:200%_100%] bg-left hover:bg-right transition-all duration-500">
             Filter
         </button>
+        </div>
+
 
         <!-- Slide-in Filter Drawer (left) -->
         <aside x-cloak x-show="drawerOpen" x-transition.opacity class="fixed inset-0 z-40">
@@ -57,9 +67,10 @@
             <div class="absolute inset-0 bg-black/50" @click="drawerOpen=false"></div>
 
             <!-- Panel -->
-            <div x-transition:enter="transition transform ease-out duration-300" x-transition:enter-start="-translate-x-full"
-                x-transition:enter-end="translate-x-0" x-transition:leave="transition transform ease-in duration-200"
-                x-transition:leave-start="translate-x-0" x-transition:leave-end="-translate-x-full"
+            <div x-transition:enter="transition transform ease-out duration-300"
+                x-transition:enter-start="-translate-x-full" x-transition:enter-end="translate-x-0"
+                x-transition:leave="transition transform ease-in duration-200" x-transition:leave-start="translate-x-0"
+                x-transition:leave-end="-translate-x-full"
                 class="absolute left-0 top-0 h-full w-80 max-w-[85vw] bg-white shadow-2xl p-5 overflow-y-auto">
 
                 <div class="flex items-center justify-between mb-4">
