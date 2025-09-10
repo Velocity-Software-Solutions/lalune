@@ -8,8 +8,8 @@
 
         <div class="flex items-center justify-between mb-5">
             <h2 class="text-2xl font-bold text-gray-800 dark:text-white">Orders</h2>
-            <a href="{{ route('admin.orders.create') }}"
-                class="px-4 py-2 text-white bg-blue-600 rounded hover:bg-blue-700">+ New Order</a>
+            <a href="{{ route('admin.orders.create') }}" class="px-4 py-2 text-white bg-blue-600 rounded hover:bg-blue-700">+
+                New Order</a>
         </div>
 
         @if (session('success'))
@@ -36,7 +36,10 @@
                             <td class="p-3">{{ $loop->iteration }}</td>
                             <td class="p-3 font-mono">{{ $order->order_number }}</td>
                             <td class="p-3">{{ $order->user->name ?? 'Guest' }}</td>
-                            <td class="p-3">${{ number_format($order->total_amount, 2) }}</td>
+                            <td class="p-3">
+                                {{ strtoupper($order->currency ?? 'CAD') }}
+                                {{ number_format(($order->total_cents ?? 0) / 100, 2) }}
+                            </td>
                             <td class="p-3 capitalize">{{ $order->order_status }}</td>
                             <td class="p-3 capitalize">{{ $order->payment_status }}</td>
                             <td class="p-3">{{ $order->created_at->format('Y-m-d') }}</td>
@@ -45,8 +48,8 @@
                                     class="text-blue-600 hover:underline">View</a>
                                 <a href="{{ route('admin.orders.edit', $order) }}"
                                     class="text-green-600 hover:underline">Edit</a>
-                                <form action="{{ route('admin.orders.destroy', $order) }}" method="POST"
-                                    class="inline" onsubmit="return confirm('Delete this order?');">
+                                <form action="{{ route('admin.orders.destroy', $order) }}" method="POST" class="inline"
+                                    onsubmit="return confirm('Delete this order?');">
                                     @csrf
                                     @method('DELETE')
                                     <button class="text-red-600 hover:underline">Delete</button>

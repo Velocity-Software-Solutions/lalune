@@ -2,7 +2,6 @@
 
 use App\Http\Controllers\CollectionController;
 use App\Http\Controllers\ContactController;
-use App\Http\Controllers\CouponController;
 use App\Http\Middleware\SetLocale;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\CheckoutController;
@@ -62,9 +61,8 @@ Route::put('/cart/update/{id}', [CartController::class, 'update'])->name('cart.u
 Route::delete('/cart/remove/{id}', [CartController::class, 'remove'])->name('cart.remove'); // Remove item
 
 // Coupon actions (two possible endpoints for flexibility)
-Route::post('/cart/apply-coupon', [CartController::class, 'applyCoupon'])->name('cart.applyCoupon');
-Route::post('/coupon/apply', [CouponController::class, 'apply'])->name('coupon.apply');
-Route::post('/coupon/remove', [CouponController::class, 'remove'])->name('coupon.remove');
+Route::post('/cart/apply-promo', [CartController::class, 'applyPromo'])->name('cart.applyPromo');
+Route::delete('/cart/remove-promo/{code}', [CartController::class, 'removePromo'])->name('cart.removePromo');
 
 /*
 |--------------------------------------------------------------------------

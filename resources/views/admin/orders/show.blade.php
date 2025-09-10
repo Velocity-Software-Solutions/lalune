@@ -152,6 +152,78 @@
     </div>
   </div>
 
+  @php
+  // Read promos from order->metadata
+  $meta           = (array) ($order->metadata ?? []);
+  $promosApplied  = (array) ($meta['promos_applied'] ?? []);
+
+  // Split into shipping + discount (there can be up to 2 according to your rules)
+  $shipPromo   = collect($promosApplied)->firstWhere('type', 'shipping') ?? [];
+  $discPromo   = collect($promosApplied)->first(function($p){
+      return in_array(($p['type'] ?? ''), ['fixed','percentage'], true);
+  }) ?? [];
+
+  // Helpers
+  $discCode    = $discPromo['code'] ?? null;
+  $discType    = $discPromo['type'] ?? null;         // 'fixed' | 'percentage'
+  $discPercent = $discPromo['percent'] ?? null;      // if percentage
+  $discAmount  = (int) ($discPromo['amount_cents'] ?? 0);
+  $shipCode    = $shipPromo['code'] ?? null;
+
+  $fmt = fn($c) => number_format(($c ?? 0)/100, 2);
+@endphp
+
+{{-- Promotions (from order->metadata.promos_applied) --}}
+<div class="mt-6 bg-white dark:bg-gray-900 rounded-2xl shadow ring-1 ring-gray-200 dark:ring-gray-700 overflow-hidden">
+  <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700">
+    <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">Promotions</h3>
+  </div>
+
+  <div class="px-5 py-4">
+    @if(!$shipCode && !$discCode)
+      <p class="text-sm text-gray-600 dark:text-gray-300">No promotions applied.</p>
+    @else
+      <ul class="space-y-3">
+        {{-- Free Shipping --}}
+        @if($shipCode)
+          <li class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
+                Free Shipping
+              </span>
+              <span class="text-sm text-gray-800 dark:text-gray-100">
+                Code: <span class="font-mono">{{ strtoupper($shipCode) }}</span>
+              </span>
+            </div>
+            <span class="text-sm font-medium text-emerald-700">Shipping waived</span>
+          </li>
+        @endif
+
+        {{-- Discount (fixed or percentage) --}}
+        @if($discCode)
+          <li class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800">
+                {{ $discType === 'percentage' ? ($discPercent.'% Off') : 'Amount Off' }}
+              </span>
+              <span class="text-sm text-gray-800 dark:text-gray-100">
+                Code: <span class="font-mono">{{ strtoupper($discCode) }}</span>
+              </span>
+            </div>
+            <span class="text-sm font-medium text-emerald-700">
+              {{-- If you captured the actual removed amount in amount_cents, show it --}}
+              @if($discAmount > 0)
+                − {{ $order->currency ?? 'USD' }} {{ $fmt($discAmount) }}
+              @endif
+            </span>
+          </li>
+        @endif
+      </ul>
+    @endif
+  </div>
+</div>
+
+
   {{-- Addresses --}}
   <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
     <div class="rounded-2xl ring-1 ring-gray-200 dark:ring-gray-700 bg-white dark:bg-gray-900 p-4">

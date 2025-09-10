@@ -20,14 +20,17 @@ class OrderController extends Controller
     /* --------------------------------------------------------------
      | Index: list orders
      |-------------------------------------------------------------- */
-    public function index()
+
+    public function index(Request $request)
     {
-        $orders = Order::with(['user:id,name,email'])
+        // Eager load user to avoid N+1 queries
+        $orders = Order::with('user')
             ->latest()
-            ->paginate(20);
+            ->paginate(15);
 
         return view('admin.orders.index', compact('orders'));
     }
+
 
     /* --------------------------------------------------------------
      | Create: show new order form
@@ -50,65 +53,68 @@ public function store(Request $request)
     // ---------- Validate ----------
     $validated = $request->validate([
         // customer mode
-        'customer_mode'         => 'required|in:existing,new',
+        'customer_mode' => 'required|in:existing,new',
 
         // existing OR new must provide an email
-        'email'                 => 'required|email:rfc,dns',
-        'name'                  => 'nullable|string|max:255',
+        'email' => 'required|email:rfc,dns',
+        'name'  => 'nullable|string|max:255',
 
         // links (optional)
-        'user_id'               => 'nullable|integer|exists:users,id',
+        'user_id' => 'nullable|integer|exists:users,id',
 
         // addresses
-        'shipping_address'      => 'required|string|max:5000',
-        'billing_address'       => 'nullable|string|max:5000',
+        'shipping_address' => 'required|string|max:5000',
+        'billing_address'  => 'nullable|string|max:5000',
 
         // money/meta
-        'payment_method'        => 'required|string|max:100',
-        'coupon_id'             => 'nullable|integer|exists:coupons,id',
-        'notes'                 => 'nullable|string|max:5000',
+        'payment_method' => 'required|string|max:100',
+        'coupon_id'      => 'nullable|integer|exists:coupons,id',
+        'notes'          => 'nullable|string|max:5000',
 
         // items
-        'items'                 => 'required|array|min:1',
-        'items.*.product_id'    => 'nullable|integer|exists:products,id',
-        'items.*.product_name'  => 'nullable|string|max:255',
-        'items.*.price'         => 'required|numeric|min:0',
-        'items.*.quantity'      => 'required|integer|min:1',
+        'items' => 'required|array|min:1',
+        'items.*.product_id'   => 'nullable|integer|exists:products,id',
+        'items.*.product_name' => 'nullable|string|max:255',
+        'items.*.price'        => 'required|numeric|min:0',
+        'items.*.quantity'     => 'required|integer|min:1',
+
+        // promos (optional – only stored in metadata)
+        'promos'                           => 'array',
+        'promos.shipping.code'             => 'nullable|string|max:100',
+        'promos.discount.code'             => 'nullable|string|max:100',
+        'promos.discount.type'             => 'nullable|in:fixed,percentage',
+        'promos.discount.percent'          => 'nullable|numeric|min:0',
+        'promos.discount.amount_cents'     => 'nullable|integer|min:0',
     ]);
 
-    // Normalize currency (set yours here)
+    // Normalize currency
     $currency = strtoupper(config('app.currency', 'USD'));
 
     // ---------- Resolve/normalize customer ----------
     $email = trim($validated['email']);
-    $name  = trim((string)($validated['name'] ?? ''));
+    $name  = trim((string) ($validated['name'] ?? ''));
 
     $userId = null;
-
     if ($validated['customer_mode'] === 'existing') {
-        // If a user exists with that email, attach it; otherwise leave null (guest-by-email).
         $existing = User::where('email', $email)->first();
         $userId   = $existing?->id ?? ($validated['user_id'] ?? null);
-    } else { // 'new'
-        // If a user already exists with this email, reuse it; else keep guest order (user_id null).
+    } else {
         $existing = User::where('email', $email)->first();
         $userId   = $existing?->id ?? null;
-        // Optionally: create a user here if you want
-        // if (!$existing) { $user = User::create([...]); $userId = $user->id; }
     }
 
     // ---------- Build line items + totals ----------
-    $lineItems = [];
-    $subtotalCents = 0;
+    $orderItemsForCreate = [];
+    $itemsSnapshot       = []; // compact snapshot like checkout (but from admin form)
+    $subtotalCents       = 0;
 
     foreach ($validated['items'] as $row) {
-        $qty   = (int) $row['quantity'];
-        $price = (float) $row['price'];              // dollars
-        $cents = (int) round($price * 100);          // to cents
+        $qty    = (int) $row['quantity'];
+        $price  = (float) $row['price'];        // dollars
+        $cents  = (int) round($price * 100);    // to cents
 
-        $productId   = $row['product_id'] ?? null;
-        $productName = trim((string)($row['product_name'] ?? ''));
-
+        $productId    = $row['product_id'] ?? null;
+        $productName  = trim((string) ($row['product_name'] ?? ''));
         $resolvedName = $productName;
         $sku          = null;
         $productThumb = null;
@@ -116,106 +122,127 @@ public function store(Request $request)
         if ($productId) {
             $product = Product::with('images')->find($productId);
             if ($product) {
-                // If admin left product_name blank, use product's
-                if ($resolvedName === '') {
-                    $resolvedName = $product->name;
-                }
+                if ($resolvedName === '') $resolvedName = $product->name;
                 $sku          = $product->sku ?? null;
                 $productThumb = $product->images->first()?->image_path;
             }
         }
 
-        $rowSubtotal = $cents * $qty;
+        if ($resolvedName === '') $resolvedName = 'Custom Item';
+
+        $rowSubtotal   = $cents * $qty;
         $subtotalCents += $rowSubtotal;
 
-        $lineItems[] = [
+        $orderItemsForCreate[] = [
             'product_id'        => $productId,
-            'name'              => $resolvedName !== '' ? $resolvedName : 'Custom Item',
+            'name'              => $resolvedName,
             'sku'               => $sku,
             'quantity'          => $qty,
             'unit_price_cents'  => $cents,
             'subtotal_cents'    => $rowSubtotal,
             'discount_cents'    => 0,
             'tax_cents'         => 0,
-            'total_cents'       => $rowSubtotal,  // no tax/discount here; adjust below if you add them
+            'total_cents'       => $rowSubtotal, // no tax/discount per-line here
             'currency'          => $currency,
             'snapshot'          => [
-                'image_url' => $productThumb ? asset('storage/'.$productThumb) : null,
+                'image_url' => $productThumb ? asset('storage/' . $productThumb) : null,
+                // optional: 'variant' => ['color'=>..., 'size'=>...]
             ],
+        ];
+
+        // Add to compact items snapshot similar to Stripe pull
+        $itemsSnapshot[] = [
+            'description'      => $resolvedName,
+            'quantity'         => $qty,
+            'amount_subtotal'  => $rowSubtotal,
+            'amount_total'     => $rowSubtotal,
+            'currency'         => $currency,
+            // keep room for variants if you later add fields in the form
+            'color'            => null,
+            'size'             => null,
+            'image_url'        => $productThumb ? asset('storage/' . $productThumb) : null,
         ];
     }
 
-    // If you want to calculate shipping/tax/discount server-side, do it here.
-    // For now, keep them 0 and rely on coupon/shipping rules later if needed.
+    // Totals (admin-driven; leave discount/shipping/tax to 0 here)
     $discountCents = 0;
     $shippingCents = 0;
     $taxCents      = 0;
     $totalCents    = max(0, $subtotalCents - $discountCents + $shippingCents + $taxCents);
 
-    // ---------- Addresses as JSON (new schema style) ----------
+    // ---------- Addresses JSON (new schema style) ----------
     $shippingJson = ['raw' => $validated['shipping_address']];
     $billingJson  = ['raw' => $validated['billing_address'] ?? $validated['shipping_address']];
 
+    // ---------- Build promos_applied metadata (like checkout) ----------
+    $promosInput    = $request->input('promos', []);
+    $promosApplied  = [];
+
+    $shipCode = data_get($promosInput, 'shipping.code');
+    if ($shipCode) {
+        $promosApplied[] = ['code' => $shipCode, 'type' => 'shipping'];
+    }
+
+    $discCode = data_get($promosInput, 'discount.code');
+    if ($discCode) {
+        $promosApplied[] = [
+            'code'         => $discCode,
+            'type'         => data_get($promosInput, 'discount.type'),        // fixed|percentage
+            'percent'      => data_get($promosInput, 'discount.percent'),
+            'amount_cents' => (int) (data_get($promosInput, 'discount.amount_cents', 0)),
+        ];
+    }
+
     // ---------- Persist ----------
-    return DB::transaction(function () use (
-        $request, $validated, $userId, $name, $email,
-        $currency, $subtotalCents, $discountCents, $shippingCents, $taxCents, $totalCents,
-        $shippingJson, $billingJson, $lineItems
+    return \DB::transaction(function () use (
+        $request, $validated, $userId, $name, $email, $currency,
+        $subtotalCents, $discountCents, $shippingCents, $taxCents, $totalCents,
+        $shippingJson, $billingJson, $orderItemsForCreate, $itemsSnapshot, $promosApplied
     ) {
         $order = Order::create([
-            'user_id'               => $userId, // nullable
-            'coupon_id'             => $validated['coupon_id'] ?? null,
+            'user_id'    => $userId,
+            'coupon_id'  => $validated['coupon_id'] ?? null,
 
-            'order_number'          => 'ORD-'.now()->format('Ymd').'-'.strtoupper(Str::random(6)),
+            'order_number' => 'ORD-' . now()->format('Ymd') . '-' . strtoupper(\Illuminate\Support\Str::random(6)),
 
             'stripe_payment_intent' => null,
             'stripe_customer_id'    => null,
 
-            'full_name'             => $name ?: $email,
-            'email'                 => $email,
-            'phone'                 => null,
+            'full_name' => $name ?: $email,
+            'email'     => $email,
+            'phone'     => null,
 
-            'currency'              => $currency,
-            'subtotal_cents'        => $subtotalCents,
-            'discount_cents'        => $discountCents,
-            'shipping_cents'        => $shippingCents,
-            'tax_cents'             => $taxCents,
-            'total_cents'           => $totalCents,
+            'currency'       => $currency,
+            'subtotal_cents' => $subtotalCents,
+            'discount_cents' => $discountCents,
+            'shipping_cents' => $shippingCents,
+            'tax_cents'      => $taxCents,
+            'total_cents'    => $totalCents,
 
-            // Admin-created: usually pending payment or paid manually
-            'payment_status'        => 'pending',
-            'order_status'          => 'processing',
-            'payment_method'        => $validated['payment_method'],
+            'payment_status' => 'pending',
+            'order_status'   => 'processing',
+            'payment_method' => $validated['payment_method'],
 
-            'paid_at'               => null,
+            'paid_at' => null,
 
             'shipping_address_json' => $shippingJson,
             'billing_address_json'  => $billingJson,
 
-            'coupon_code'           => optional(Coupon::find($validated['coupon_id'] ?? null))->code,
-            'ip_address'            => $request->ip(),
-            'user_agent'            => substr((string) $request->userAgent(), 0, 1000),
+            'coupon_code' => optional(Coupon::find($validated['coupon_id'] ?? null))->code,
+            'ip_address'  => $request->ip(),
+            'user_agent'  => substr((string) $request->userAgent(), 0, 1000),
 
-            'snapshot'              => null, // optional: you can store a summary here
-            'metadata'              => ['source' => 'admin'],
-            'notes'                 => $validated['notes'] ?? null,
+            // snapshot & metadata (like checkout)
+            'snapshot' => $itemsSnapshot,
+            'metadata' => [
+                'source'         => 'admin',
+                'promos_applied' => $promosApplied,
+            ],
+            'notes' => $validated['notes'] ?? null,
         ]);
 
-        foreach ($lineItems as $li) {
-            OrderItem::create([
-                'order_id'          => $order->id,
-                'product_id'        => $li['product_id'],
-                'name'              => $li['name'],
-                'sku'               => $li['sku'] ?? null,
-                'quantity'          => $li['quantity'],
-                'unit_price_cents'  => $li['unit_price_cents'],
-                'subtotal_cents'    => $li['subtotal_cents'],
-                'discount_cents'    => $li['discount_cents'],
-                'tax_cents'         => $li['tax_cents'],
-                'total_cents'       => $li['total_cents'],
-                'currency'          => $li['currency'],
-                'snapshot'          => $li['snapshot'] ?? null,
-            ]);
+        foreach ($orderItemsForCreate as $li) {
+            OrderItem::create(array_merge($li, ['order_id' => $order->id]));
         }
 
         return redirect()
@@ -260,91 +287,133 @@ public function store(Request $request)
     /* --------------------------------------------------------------
      | Update: status + shipping + payment
      |-------------------------------------------------------------- */
-    public function update(Request $request, Order $order)
-    {
-        $validated = $request->validate([
-            'order_status' => 'required|in:pending,processing,shipped,delivered,cancelled',
-            'payment_status' => 'required|in:pending,paid,failed,refunded',
-            'notes' => 'nullable|string',
+public function update(Request $request, Order $order)
+{
+    $validated = $request->validate([
+        'order_status'   => 'required|in:pending,processing,shipped,delivered,cancelled',
+        'payment_status' => 'required|in:pending,paid,failed,refunded',
+        'notes'          => 'nullable|string',
 
-            // addresses
-            'ship' => 'array',
-            'bill' => 'array',
+        // addresses
+        'ship' => 'array',
+        'bill' => 'array',
 
-            // money (dollars)
-            'discount_amount' => 'nullable|numeric|min:0',
-            'shipping_amount' => 'nullable|numeric|min:0',
-            'tax_amount' => 'nullable|numeric|min:0',
+        // money (dollars)
+        'discount_amount' => 'nullable|numeric|min:0',
+        'shipping_amount' => 'nullable|numeric|min:0',
+        'tax_amount'      => 'nullable|numeric|min:0',
 
-            // items
-            'items' => 'array',
-            'items.*.id' => 'required|integer|exists:order_items,id',
-            'items.*.quantity' => 'required|integer|min:1',
-            'items.*.unit_price' => 'required|numeric|min:0', // dollars
-            'items.*.color' => 'nullable|string|max:50',
-            'items.*.size' => 'nullable|string|max:50',
-        ]);
+        // items
+        'items'                  => 'array',
+        'items.*.id'             => 'required|integer|exists:order_items,id',
+        'items.*.quantity'       => 'required|integer|min:1',
+        'items.*.unit_price'     => 'required|numeric|min:0', // dollars
+        'items.*.color'          => 'nullable|string|max:50',
+        'items.*.size'           => 'nullable|string|max:50',
 
-        // Update order-level simple fields
-        $order->order_status = $validated['order_status'];
-        $order->payment_status = $validated['payment_status'];
-        $order->notes = $validated['notes'] ?? null;
+        // promos (optional – store in metadata)
+        'promos'                           => 'array',
+        'promos.shipping.code'             => 'nullable|string|max:100',
+        'promos.discount.code'             => 'nullable|string|max:100',
+        'promos.discount.type'             => 'nullable|in:fixed,percentage',
+        'promos.discount.percent'          => 'nullable|numeric|min:0',
+        'promos.discount.amount_cents'     => 'nullable|integer|min:0',
+    ]);
 
-        // Update addresses JSON
-        $ship = $request->input('ship', []);
-        $bill = $request->input('bill', []);
-        $order->shipping_address_json = $ship;
-        $order->billing_address_json = $bill;
+    // Basic fields
+    $order->order_status   = $validated['order_status'];
+    $order->payment_status = $validated['payment_status'];
+    $order->notes          = $validated['notes'] ?? null;
 
-        // Update line items and recalc totals
-        $subtotal = 0;
-        foreach ($validated['items'] as $row) {
-            /** @var \App\Models\OrderItem $item */
-            $item = $order->items()->whereKey($row['id'])->firstOrFail();
+    // Addresses JSON
+    $order->shipping_address_json = $request->input('ship', []);
+    $order->billing_address_json  = $request->input('bill', []);
 
-            $qty = (int) $row['quantity'];
-            $unitCents = (int) round(($row['unit_price'] ?? 0) * 100);
-            $subCents = $qty * $unitCents;
+    // Update line items & recalc subtotal (cents)
+    $subtotal = 0;
+    foreach ($validated['items'] as $row) {
+        /** @var OrderItem $item */
+        $item = $order->items()->whereKey($row['id'])->firstOrFail();
 
-            // snapshot: keep existing, override color/size if provided
-            $snap = is_array($item->snapshot) ? $item->snapshot : [];
-            if (!empty($row['color']))
-                $snap['color'] = $row['color'];
-            if (!empty($row['size']))
-                $snap['size'] = $row['size'];
+        $qty       = (int) $row['quantity'];
+        $unitCents = (int) round(($row['unit_price'] ?? 0) * 100);
+        $subCents  = $qty * $unitCents;
 
-            $item->quantity = $qty;
-            $item->unit_price_cents = $unitCents;
-            $item->subtotal_cents = $subCents;
+        // snapshot: keep existing; override color/size if provided
+        $snap = is_array($item->snapshot) ? $item->snapshot : [];
+        if (!empty($row['color'])) $snap['color'] = $row['color'];
+        if (!empty($row['size']))  $snap['size']  = $row['size'];
 
-            // Keep discount/tax per-line 0 unless you implement proration
-            $item->discount_cents = $item->discount_cents ?? 0;
-            $item->tax_cents = $item->tax_cents ?? 0;
-            $item->total_cents = $subCents - ($item->discount_cents ?? 0) + ($item->tax_cents ?? 0);
-            $item->snapshot = $snap;
-            $item->save();
+        $item->quantity          = $qty;
+        $item->unit_price_cents  = $unitCents;
+        $item->subtotal_cents    = $subCents;
+        $item->discount_cents    = $item->discount_cents ?? 0;
+        $item->tax_cents         = $item->tax_cents ?? 0;
+        $item->total_cents       = $subCents - ($item->discount_cents ?? 0) + ($item->tax_cents ?? 0);
+        $item->snapshot          = $snap;
+        $item->save();
 
-            $subtotal += $subCents;
-        }
-
-        // Order totals
-        $discount = (int) round(($validated['discount_amount'] ?? 0) * 100);
-        $shipping = (int) round(($validated['shipping_amount'] ?? 0) * 100);
-        $tax = (int) round(($validated['tax_amount'] ?? 0) * 100);
-        $total = max(0, $subtotal - $discount + $shipping + $tax);
-
-        $order->subtotal_cents = $subtotal;
-        $order->discount_cents = $discount;
-        $order->shipping_cents = $shipping;
-        $order->tax_cents = $tax;
-        $order->total_cents = $total;
-
-        $order->save();
-
-        return redirect()
-            ->route('admin.orders.show', $order)
-            ->with('success', 'Order updated successfully.');
+        $subtotal += $subCents;
     }
+
+    // Order totals (admin-provided numbers)
+    $discount = (int) round(($validated['discount_amount'] ?? 0) * 100);
+    $shipping = (int) round(($validated['shipping_amount'] ?? 0) * 100);
+    $tax      = (int) round(($validated['tax_amount'] ?? 0) * 100);
+    $total    = max(0, $subtotal - $discount + $shipping + $tax);
+
+    $order->subtotal_cents = $subtotal;
+    $order->discount_cents = $discount;
+    $order->shipping_cents = $shipping;
+    $order->tax_cents      = $tax;
+    $order->total_cents    = $total;
+
+    // ---- Refresh order-level snapshot (compact) ----
+    $currency = $order->currency ?? 'USD';
+    $itemsSnapshot = $order->items->map(function ($it) use ($currency) {
+        $snap   = (array) ($it->snapshot ?? []);
+        return [
+            'description'      => $it->name,
+            'quantity'         => (int) $it->quantity,
+            'amount_subtotal'  => (int) $it->subtotal_cents,
+            'amount_total'     => (int) $it->total_cents,
+            'currency'         => $currency,
+            'color'            => $snap['color'] ?? data_get($snap, 'variant.color'),
+            'size'             => $snap['size']  ?? data_get($snap, 'variant.size'),
+            'image_url'        => $snap['image_url'] ?? null,
+        ];
+    })->values()->all();
+
+    // ---- Update promos_applied in metadata (like checkout) ----
+    $promosInput   = $request->input('promos', []);
+    $promosApplied = [];
+    $shipCode      = data_get($promosInput, 'shipping.code');
+    if ($shipCode) {
+        $promosApplied[] = ['code' => $shipCode, 'type' => 'shipping'];
+    }
+    $discCode = data_get($promosInput, 'discount.code');
+    if ($discCode) {
+        $promosApplied[] = [
+            'code'         => $discCode,
+            'type'         => data_get($promosInput, 'discount.type'),
+            'percent'      => data_get($promosInput, 'discount.percent'),
+            'amount_cents' => (int) (data_get($promosInput, 'discount.amount_cents', 0)),
+        ];
+    }
+
+    $meta = is_array($order->metadata) ? $order->metadata : [];
+    $meta['promos_applied'] = $promosApplied;
+    $order->metadata = $meta;
+
+    // Save order
+    $order->snapshot = $itemsSnapshot;
+    $order->save();
+
+    return redirect()
+        ->route('admin.orders.show', $order)
+        ->with('success', 'Order updated successfully.');
+}
+
 
 
 

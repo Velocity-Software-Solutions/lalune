@@ -208,6 +208,111 @@
       </div>
     </div>
 
+    @php
+  // Read promos from metadata
+  $meta          = (array) ($order->metadata ?? []);
+  $promosApplied = (array) ($meta['promos_applied'] ?? []);
+
+  $shipPromo = collect($promosApplied)->firstWhere('type', 'shipping') ?? [];
+  $discPromo = collect($promosApplied)->first(function($p){
+      return in_array(($p['type'] ?? ''), ['fixed','percentage'], true);
+  }) ?? [];
+
+  $shipCode    = old('promos.shipping.code', $shipPromo['code'] ?? '');
+  $discCode    = old('promos.discount.code', $discPromo['code'] ?? '');
+  $discType    = old('promos.discount.type', $discPromo['type'] ?? '');           // fixed|percentage
+  $discPct     = old('promos.discount.percent', $discPromo['percent'] ?? null);   // for percentage
+  $discAmtCts  = (int) old('promos.discount.amount_cents', $discPromo['amount_cents'] ?? 0);
+
+  $fmt = fn($c) => number_format(($c ?? 0)/100, 2);
+@endphp
+
+{{-- Promotions --}}
+<div class="bg-white dark:bg-gray-900 rounded-2xl shadow ring-1 ring-gray-200 dark:ring-gray-700 overflow-hidden">
+  <div class="px-5 py-4 border-b border-gray-100 dark:border-gray-700">
+    <h3 class="text-base font-semibold text-gray-900 dark:text-white">Promotions</h3>
+    <p class="mt-1 text-xs text-gray-500">
+      One shipping promo + one discount promo (fixed or %). Leave blank to remove.
+    </p>
+  </div>
+
+  <div class="px-5 py-4 grid grid-cols-1 md:grid-cols-2 gap-6">
+    {{-- Shipping promo --}}
+    <div class="space-y-3">
+      <div class="text-sm font-medium text-gray-800 dark:text-gray-100">Shipping</div>
+      <label class="block text-xs text-gray-500">Code</label>
+      <input type="text" name="promos[shipping][code]"
+             value="{{ $shipCode }}"
+             class="form-input w-full" placeholder="e.g. FREESHIP">
+
+      {{-- Optional: capture waived shipping amount for display/reporting (cents) --}}
+      <label class="block mt-3 text-xs text-gray-500">Waived amount (optional, cents)</label>
+      <input type="number" min="0" step="1" name="promos[shipping][amount_cents]"
+             value="{{ old('promos.shipping.amount_cents', (int) ($shipPromo['amount_cents'] ?? 0)) }}"
+             class="form-input w-full" placeholder="e.g. 1500 for CAD 15.00">
+    </div>
+
+    {{-- Discount promo --}}
+    <div class="space-y-3">
+      <div class="text-sm font-medium text-gray-800 dark:text-gray-100">Discount</div>
+
+      <label class="block text-xs text-gray-500">Code</label>
+      <input type="text" name="promos[discount][code]"
+             value="{{ $discCode }}"
+             class="form-input w-full" placeholder="e.g. SAVE10">
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
+        <div>
+          <label class="block text-xs text-gray-500">Type</label>
+          <select name="promos[discount][type]" class="form-select w-full" x-data x-init="$el.value = '{{ $discType }}'">
+            <option value="">None</option>
+            <option value="fixed" @selected($discType==='fixed')>Fixed</option>
+            <option value="percentage" @selected($discType==='percentage')>%</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs text-gray-500">% (if percentage)</label>
+          <input type="number" min="0" step="0.01" name="promos[discount][percent]"
+                 value="{{ $discPct }}"
+                 class="form-input w-full" placeholder="e.g. 10">
+        </div>
+
+        <div>
+          <label class="block text-xs text-gray-500">Amount (cents, if fixed)</label>
+          <input type="number" min="0" step="1" name="promos[discount][amount_cents]"
+                 value="{{ $discAmtCts }}"
+                 class="form-input w-full" placeholder="e.g. 1000 for CAD 10.00">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  @if($discType || $shipCode)
+    <div class="px-5 pb-4 text-xs text-gray-500">
+      Current: 
+      @if($shipCode)
+        <span class="inline-flex items-center gap-1 mr-3">
+          <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">Shipping</span>
+          <span class="font-mono">{{ strtoupper($shipCode) }}</span>
+        </span>
+      @endif
+      @if($discType)
+        <span class="inline-flex items-center gap-1">
+          <span class="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">
+            {{ $discType === 'percentage' ? (($discPct ?? 0).'%') : 'Fixed' }}
+          </span>
+          <span class="font-mono">{{ strtoupper($discCode) }}</span>
+          @if($discAmtCts>0)
+            <span class="text-gray-400">· − {{ $order->currency ?? 'USD' }} {{ $fmt($discAmtCts) }}</span>
+          @endif
+        </span>
+      @endif
+    </div>
+  @endif
+</div>
+
+
     {{-- Items --}}
     <div class="bg-white dark:bg-gray-900 rounded-2xl shadow ring-1 ring-gray-200 dark:ring-gray-700 overflow-hidden">
       <div class="px-5 py-4 border-b border-gray-100 dark:border-gray-700">

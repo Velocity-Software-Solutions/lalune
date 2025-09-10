@@ -1,7 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\CategoryController;
-use App\Http\Controllers\Admin\CouponController;
+use App\Http\Controllers\Admin\PromoCodeController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\ProductController;
 use App\Http\Controllers\Admin\ShippingOptionController;
@@ -23,7 +23,7 @@ Route::middleware(['auth', IsAdmin::class])->group(function () {
     Route::resource('categories', CategoryController::class);
     Route::resource('collections', CollectionController::class);
     Route::resource('products', ProductController::class);
-    Route::resource('coupons', CouponController::class);
+    Route::resource('promo-codes', PromoCodeController::class);
     // Route::resource('shipping-options', ShippingOptionController::class);
     Route::resource('orders', OrderController::class);
     Route::post('/product/image/delete', [ProductController::class, 'deleteImage'])->name('product.image.delete');

@@ -97,7 +97,7 @@
                     </li>
                 </a>
 
-            <a href="{{ route('admin.coupons.index') }}" class="w-full">
+            <a href="{{ route('admin.promo-codes.index') }}" class="w-full">
                 <li
                     class="flex items-center w-full gap-2 p-2 rounded-xl hover:bg-gray-300 dark:hover:bg-gray-500 group">
                     <span
