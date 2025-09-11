@@ -5,55 +5,63 @@
 @endpush
 
 @section('content')
-@php
-    // Existing subtotal from your controller:
-    $itemsSubtotal = (float) ($subtotal ?? 0);
+    @php
+        // Existing subtotal from your controller:
+        $itemsSubtotal = (float) ($subtotal ?? 0);
 
-    // Read applied promos (from session)
-    $promos = collect(session('promos', []));
+        // Read applied promos (from session)
+        $promos = collect(session('promos', []));
 
-    // Shipping: you can keep your default (15 CAD) here or read from session
-    $shippingBefore = (float) (session('shipping_amount') ?? 15.00);
+        // Shipping: you can keep your default (15 CAD) here or read from session
+        $shippingBefore = (float) (session('shipping_amount') ?? 15.0);
 
-    // Shipping promo?
-    $hasFreeShipping = $promos->contains(fn($p) => ($p['discount_type'] ?? null) === 'shipping');
+        // Shipping promo?
+        $hasFreeShipping = $promos->contains(fn($p) => ($p['discount_type'] ?? null) === 'shipping');
 
-    // One discount promo (fixed or percentage)
-    $discountPromo = $promos->first(fn($p) => in_array(($p['discount_type'] ?? ''), ['fixed','percentage'], true));
+        // One discount promo (fixed or percentage)
+        $discountPromo = $promos->first(fn($p) => in_array($p['discount_type'] ?? '', ['fixed', 'percentage'], true));
 
-    // Compute discount amount
-    $discountAmount = 0.0;
-    if ($discountPromo) {
-        $type = $discountPromo['discount_type'] ?? '';
-        if ($type === 'fixed') {
-            $discountAmount = (float) ($discountPromo['amount'] ?? $discountPromo['value'] ?? 0.0);
-        } elseif ($type === 'percentage') {
-            $percent        = (float) ($discountPromo['percent'] ?? $discountPromo['value'] ?? 0.0);
-            $discountAmount = round($itemsSubtotal * ($percent / 100), 2);
+        // Compute discount amount
+        $discountAmount = 0.0;
+        if ($discountPromo) {
+            $type = $discountPromo['discount_type'] ?? '';
+            if ($type === 'fixed') {
+                $discountAmount = (float) ($discountPromo['amount'] ?? ($discountPromo['value'] ?? 0.0));
+            } elseif ($type === 'percentage') {
+                $percent = (float) ($discountPromo['percent'] ?? ($discountPromo['value'] ?? 0.0));
+                $discountAmount = round($itemsSubtotal * ($percent / 100), 2);
+            }
+            // cap at subtotal
+            $discountAmount = min($discountAmount, $itemsSubtotal);
         }
-        // cap at subtotal
-        $discountAmount = min($discountAmount, $itemsSubtotal);
-    }
 
-    // Effective shipping after promo (for display)
-    $shippingAfter = $hasFreeShipping ? 0.0 : $shippingBefore;
+        // Effective shipping after promo (for display)
+        $shippingAfter = $hasFreeShipping ? 0.0 : $shippingBefore;
 
-    // Base total used by Alpine = items subtotal minus discount (shipping added separately)
-    $baseTotalAfterDiscount = max(0, $itemsSubtotal - $discountAmount);
-@endphp
+        // Base total used by Alpine = items subtotal minus discount (shipping added separately)
+        $baseTotalAfterDiscount = max(0, $itemsSubtotal - $discountAmount);
+    @endphp
 
     <div class="max-w-4xl px-4 py-10 mx-auto sm:px-6 lg:px-8 min-h-screen bg-white" x-data="checkoutState({
         countries: {{ Js::from($countries) }},
         shippingOptions: {{ Js::from($shippingOptions) }},
-        currency: 'CAD', // switched to CAD
-        baseTotal: {{ number_format($subtotal - ($discount ?? 0), 2, '.', '') }},
+        currency: 'CAD',
+    
+        // ✅ Use the PHP-computed base AFTER discounts (items only)
+        baseTotal: {{ Js::from($baseTotalAfterDiscount) }},
+    
+        // ✅ Pass PHP shipping-before-promo and free-shipping flag
+        shippingBefore: {{ Js::from($shippingBefore) }},
+        hasFreeShipping: {{ Js::from($hasFreeShipping) }},
+    
         initialCountry: '{{ old('country') ?: array_key_first($countries) ?? '' }}',
         initialState: '{{ old('state') }}',
         initialMatched: {
-            cost: Number('{{ old('shipping_cost', 15) }}' || 15), // default to 15 CAD
+            cost: Number('{{ old('shipping_cost', $shippingBefore) }}' || {{ $shippingBefore }}),
             id: '{{ old('shipping_option_id') }}'
         }
     })">
+
 
 
         {{-- Cart Items --}}
@@ -96,7 +104,8 @@
             {{-- Guest fields --}}
             @if (!auth()->check())
                 <div>
-                    <label for="full_name" class="block text-sm font-medium text-charcoal">{{ __('checkout.full_name') }}</label>
+                    <label for="full_name"
+                        class="block text-sm font-medium text-charcoal">{{ __('checkout.full_name') }}</label>
                     <input type="text" name="full_name" id="full_name" required
                         class="w-full mt-1 rounded-md border border-primary/30 bg-white text-charcoal shadow-sm
                               focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
@@ -104,7 +113,8 @@
                 </div>
 
                 <div>
-                    <label for="email" class="block text-sm font-medium text-charcoal">{{ __('checkout.email_address') }}</label>
+                    <label for="email"
+                        class="block text-sm font-medium text-charcoal">{{ __('checkout.email_address') }}</label>
                     <input type="email" name="email" id="email" required
                         class="w-full mt-1 rounded-md border border-primary/30 bg-white text-charcoal shadow-sm
                               focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
@@ -143,7 +153,8 @@
                 </div>
                 <template x-if="hasFreeShipping">
                     <p class="text-sm text-emerald-700">
-                        Free shipping promotion applied (was <span class="line-through text-gray-400" x-text="formatMoney(shippingBefore)"></span>)
+                        Free shipping promotion applied (was <span class="line-through text-gray-400"
+                            x-text="formatMoney(shippingBefore)"></span>)
                     </p>
                 </template>
                 <template x-if="!hasFreeShipping">
@@ -155,7 +166,8 @@
 
             {{-- Addresses --}}
             <div>
-                <label for="shipping_address" class="block mb-1 font-medium text-charcoal">{{ __('checkout.shipping_address') }}</label>
+                <label for="shipping_address"
+                    class="block mb-1 font-medium text-charcoal">{{ __('checkout.shipping_address') }}</label>
                 <textarea name="shipping_address" id="shipping_address" required
                     class="w-full p-2 rounded border border-primary/30 bg-white text-charcoal
                          focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary">{{ old('shipping_address') }}</textarea>
@@ -165,7 +177,8 @@
             </div>
 
             <div>
-                <label for="billing_address" class="block mb-1 font-medium text-charcoal">{{ __('checkout.billing_address_optional') }}</label>
+                <label for="billing_address"
+                    class="block mb-1 font-medium text-charcoal">{{ __('checkout.billing_address_optional') }}</label>
                 <textarea name="billing_address" id="billing_address"
                     class="w-full p-2 rounded border border-primary/30 bg-white text-charcoal
                          focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary">{{ old('billing_address') }}</textarea>
@@ -183,8 +196,9 @@
                     <p class="text-emerald-700">
                         {{ __('checkout.coupon_discount') }}:
                         − CAD {{ number_format($discountAmount, 2) }}
-                        @if(optional($discountPromo)['discount_type'] === 'percentage')
-                            <span class="text-gray-500">({{ (int)($discountPromo['percent'] ?? $discountPromo['value'] ?? 0) }}%)</span>
+                        @if (optional($discountPromo)['discount_type'] === 'percentage')
+                            <span
+                                class="text-gray-500">({{ (int) ($discountPromo['percent'] ?? ($discountPromo['value'] ?? 0)) }}%)</span>
                         @endif
                     </p>
                 @endif
@@ -203,15 +217,14 @@
                 {{-- Grand total: baseTotal (after discount) + shippingAfter --}}
                 <p class="font-bold text-black tracking-wide">
                     {{ __('checkout.total') }}:
-                    <span
-                        x-text="formatMoney(Number(baseTotal || 0) + (hasFreeShipping ? 0 : Number(shippingBefore || 0)))">
-                    </span>
+                    CAD {{ number_format($baseTotalAfterDiscount + $shippingAfter, 2) }}
                 </p>
+
             </div>
 
             {{-- Hidden shipping value posted to server (actual after promo) --}}
             <input type="hidden" name="shipping_cost"
-                   :value="(hasFreeShipping ? 0 : Number(shippingBefore || 0)).toFixed(2)">
+                :value="(hasFreeShipping ? 0 : Number(shippingBefore || 0)).toFixed(2)">
 
             <button type="submit"
                 class="w-full py-3 text-lg font-semibold text-white bg-gray-700 rounded
@@ -254,7 +267,10 @@
                 },
                 resolveFirstState() {
                     const entries = Object.entries(this.statesForCountry());
-                    if (!entries.length) { this.state = ''; return; }
+                    if (!entries.length) {
+                        this.state = '';
+                        return;
+                    }
                     const firstCode = entries[0][0];
                     if (!Object.keys(this.statesForCountry()).includes(this.state)) {
                         this.state = firstCode;
