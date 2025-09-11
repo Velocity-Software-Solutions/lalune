@@ -20,6 +20,6 @@ class ContactController extends Controller
         
         Mail::mailer('noreply')->to('info@lalunebyne.com')->send(new ContactMail($validated));
 
-        return response()->json(['ok' => true, 'message' => 'Sent'], 200);
+        return back()->with('success','Email Sent Successfully. Someone will be in touch shortly');
     }
 }
