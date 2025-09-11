@@ -45,7 +45,7 @@
                                 <td class="px-6 py-4">{{ __('product.currency_aed') }} {{ number_format($subtotal, 2) }}
                                 </td>
                                 <td class="px-6 py-4">
-                                    <form method="POST" action="{{ route('cart.remove', $product->id) }}">
+                                    <form method="POST" action="{{ route('cart.remove', $item->id) }}">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="text-sm text-red-600 hover:underline">
