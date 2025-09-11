@@ -422,7 +422,8 @@ public function update(Request $request, Order $order)
      |-------------------------------------------------------------- */
     public function destroy(Order $order)
     {
+        $order->items()->delete();
         $order->delete();
-        return redirect()->route('admin.admin.orders.index')->with('success', 'Order deleted.');
+        return redirect()->route('admin.orders.index')->with('success', 'Order deleted.');
     }
 }
