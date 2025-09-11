@@ -21,7 +21,7 @@ public function index(Request $request)
         return redirect()->route('home');
     }
 
-    $products = Product::where('category_id', $categoryId)
+    $products = Product::where(['category_id'=> $categoryId,'status' => 1])
         ->with('images')
         ->latest()
         ->get();
