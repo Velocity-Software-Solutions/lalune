@@ -14,6 +14,7 @@ class StoreController extends Controller
                     ->whereHas('category', function ($q) {
                 $q->where('status', 1);
             })
+            ->where('status',1)
             ->latest()
             ->get()
             ->groupBy(function ($p) use ($locale) {
