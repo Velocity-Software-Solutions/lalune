@@ -17,7 +17,6 @@ class ContactController extends Controller
             'message' => 'required|string',
         ]);
 
-        
         Mail::mailer('noreply')->to('info@lalunebyne.com')->send(new ContactMail($validated));
 
         return redirect()->route('about-us')->with('success','Email Sent Successfully. Someone will be in touch shortly');

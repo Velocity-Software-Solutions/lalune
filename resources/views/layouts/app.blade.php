@@ -209,10 +209,10 @@
             </nav>
         </div>
     </header>
-    @if (request('success'))
+    @if (session('success'))
         <div
-            class="flex justify-center items-center px-4 py-1 m-6 rounded-3xl bg-green-100 text-green-800 border border-green-200">
-            {{ request('success') }}
+            class="flex justify-center items-center px-4 py-2 mx-6 rounded bg-green-100 text-green-800 border border-green-200">
+            {{ session('success') }}
         </div>
     @endif
     <main class="py-4">
