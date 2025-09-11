@@ -20,7 +20,6 @@ class CollectionController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
-            'slug' => 'required|string|max:255',
         ]);
 
         if ($validator->fails()) {
@@ -32,7 +31,6 @@ class CollectionController extends Controller
 
         Collection::create([
             'name' => $request->name,
-            'slug' => $request->slug,
         ]);
 
         return redirect()->back()->with('success', 'Collection added successfully.');
@@ -41,11 +39,9 @@ class CollectionController extends Controller
     public function update(Request $request, string $id)
     {
         $fieldName = 'name_' . $id;
-        $fieldSlug = 'slug_' . $id;
 
         $validator = Validator::make($request->all(), [
             $fieldName => 'required|string|max:255',
-            $fieldSlug => 'required|string|max:255',
         ]);
 
         if ($validator->fails()) {
@@ -57,7 +53,6 @@ class CollectionController extends Controller
 
         $collection = Collection::findOrFail($id);
         $collection->name = $request->input($fieldName);
-        $collection->slug = $request->input($fieldSlug);
         $collection->save();
         return redirect()->back()->with('success', 'Collection updated successfully.');
     }

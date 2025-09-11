@@ -39,7 +39,6 @@
                     <tr>
                         <th class="px-5 py-3 text-left">#</th>
                         <th class="px-5 py-3 text-left">Collection Name</th>
-                        <th class="px-5 py-3 text-left">Slug</th>
                         <th class="px-5 py-3 text-center">Actions</th>
                     </tr>
                 </thead>
@@ -58,14 +57,6 @@
                                     class="w-44 text-sm rounded-md form-input" />
 
                                 @error('name')
-                                    <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
-                                @enderror
-                            </td>
-                            <td class="w-auto px-5 py-2">
-                                <input name="slug" placeholder="Enter collection slug" value="{{ old('slug') }}"
-                                    class="w-44 text-sm rounded-md form-input" />
-
-                                @error('slug')
                                     <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
                                 @enderror
                             </td>
@@ -97,14 +88,6 @@
                                         value="{{ old('name_' . $collection->id, $collection->name) }}"
                                         class="w-44 text-sm rounded-md form-input" />
                                     @error('name_' . $collection->id)
-                                        <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
-                                    @enderror
-                                </td>
-                                <td class="w-auto px-5 py-2">
-                                    <input name="slug_{{ $collection->id }}"
-                                        value="{{ old('slug_' . $collection->id, $collection->slug) }}"
-                                        class="w-44 text-sm rounded-md form-input" />
-                                    @error('slug_' . $collection->id)
                                         <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
                                     @enderror
                                 </td>
