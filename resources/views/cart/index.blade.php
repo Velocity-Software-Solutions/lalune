@@ -159,10 +159,6 @@
                                         </form>
                                     </div>
                                 @endforeach
-                                @error('promo_code')
-                                    <div class="flex bg-red-100 text-red-600 text-sm py-2 px-3 rounded-md">{{ $message }}
-                                    </div>
-                                @enderror
                             </div>
                         @else
                             {{-- Pleasant empty state --}}
@@ -180,6 +176,9 @@
                                 </p>
                             </div>
                         @endif
+                        @error('promo_code')
+                            <div class="flex bg-red-100 text-red-600 text-sm py-2 px-3 rounded-md m-5">{{ $message }}</div>
+                        @enderror
                     </div>
                 </div>
 
