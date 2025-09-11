@@ -45,13 +45,14 @@
                                 <td class="px-6 py-4">{{ __('product.currency_aed') }} {{ number_format($subtotal, 2) }}
                                 </td>
                                 <td class="px-6 py-4">
-                                    <form method="POST" action="{{ route('cart.remove', $item->id) }}">
+                                    <form method="POST" action="{{ route('cart.remove', urlencode($id)) }}">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="text-sm text-red-600 hover:underline">
                                             {{ __('cart.remove') }}
                                         </button>
                                     </form>
+
                                 </td>
                             </tr>
                         @endforeach
@@ -177,7 +178,8 @@
                             </div>
                         @endif
                         @error('promo_code')
-                            <div class="flex bg-red-100 text-red-600 text-sm py-2 px-3 rounded-md m-5">{{ $message }}</div>
+                            <div class="flex bg-red-100 text-red-600 text-sm py-2 px-3 rounded-md m-5">{{ $message }}
+                            </div>
                         @enderror
                     </div>
                 </div>
