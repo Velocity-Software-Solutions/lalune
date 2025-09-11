@@ -46,6 +46,7 @@ Schema::create('orders', function (Blueprint $table) {
 
     // Status timestamps
     $table->timestamp('paid_at')->nullable();
+    $table->timestamp('receipt_emailed_at')->nullable()->after('paid_at');
     $table->timestamp('shipped_at')->nullable();
     $table->timestamp('delivered_at')->nullable();
     $table->timestamp('cancelled_at')->nullable();
