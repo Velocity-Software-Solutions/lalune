@@ -93,12 +93,12 @@ public function applyPromo(Request $request)
         ->first();
 
     if (!$promo) {
-        return back()->withErrors(['promo_code' => 'Invalid or expired promo code.']);
+        return back()->withErrors(['promo_code' => 'Invalid or expired promo code.'])->withInput();
     }
 
     // Enforce global usage cap: usage_limit (nullable) vs used_count
     if (!is_null($promo->usage_limit) && (int)$promo->used_count >= (int)$promo->usage_limit) {
-        return back()->withErrors(['promo_code' => 'This promo code has reached its usage limit.']);
+        return back()->withErrors(['promo_code' => 'This promo code has reached its usage limit.'])->withInput();
     }
 
     // Current cart total
@@ -109,7 +109,7 @@ public function applyPromo(Request $request)
     if (!is_null($promo->min_order_amount) && $total < (float)$promo->min_order_amount) {
         return back()->withErrors([
             'promo_code' => 'Order must be at least ' . number_format((float)$promo->min_order_amount, 2) . ' to use this promo.',
-        ]);
+    ])->withInput();
     }
 
     // Already applied?
@@ -124,11 +124,11 @@ public function applyPromo(Request $request)
 
     if ($promo->discount_type === 'shipping') {
         if ($hasShipping) {
-            return back()->withErrors(['promo_code' => 'A shipping promo is already applied.']);
+            return back()->withErrors(['promo_code' => 'A shipping promo is already applied.'])->withInput();
         }
     } else { // fixed | percentage
         if ($hasDiscount) {
-            return back()->withErrors(['promo_code' => 'A discount promo is already applied.']);
+            return back()->withErrors(['promo_code' => 'A discount promo is already applied.'])->withInput();
         }
     }
 
