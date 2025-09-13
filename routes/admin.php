@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\ShippingOptionController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\Admin\CollectionController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\SummernoteController;
 use App\Http\Middleware\IsAdmin;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\OrderController;
@@ -28,4 +29,6 @@ Route::middleware(['auth', IsAdmin::class])->group(function () {
     Route::resource('orders', OrderController::class);
     Route::post('/product/image/delete', [ProductController::class, 'deleteImage'])->name('product.image.delete');
 
+    Route::post('/upload-summernote-image', [SummernoteController::class, 'store']);
+    Route::delete('/delete-summernote-image', [SummernoteController::class, 'destroy']);
 });

@@ -37,9 +37,7 @@
       </form>
     </div>
 
-    <ul class=" space-y-3 dark:text-[#ffffff] text-lg">
-
-
+    <ul class="list-none space-y-3 dark:text-[#ffffff] text-lg">
         <li>
             <button
                 class="flex items-center w-full gap-2 p-3 toggle rounded-xl hover:bg-gray-300 dark:hover:bg-gray-500 group">

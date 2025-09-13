@@ -2,6 +2,10 @@
 
 @section('title', 'Edit Product')
 
+@push('head')
+    @vite(['resources/js/summernote.js'])
+
+@endpush
 @section('content')
     @php
         // ---------- Boot from old() or model ----------
@@ -237,8 +241,7 @@
             {{-- Description --}}
             <div>
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Description</label>
-                <textarea name="description" rows="4"
-                    class="w-full mt-1 p-2 border rounded-md bg-white dark:bg-gray-700 dark:text-white">{{ old('description', $product->description) }}</textarea>
+                            <textarea class="summernote-editor" name="description">{!! old('description', $product->description) !!}</textarea>
                 @error('description')
                     <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
                 @enderror

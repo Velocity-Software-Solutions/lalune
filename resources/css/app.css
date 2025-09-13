@@ -3,6 +3,11 @@
 @tailwind components;
 @tailwind utilities;
 
+/* app.css or a custom stylesheet loaded after Tailwind */
+ol, ul {
+  list-style: revert;
+}
+
 
 .custom-scroll::-webkit-scrollbar {
   display: none;
@@ -107,6 +112,9 @@
   transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
+.note-editable{
+  background-color: #fff;
+}
 
 .hero-bg {
   background-size: 130%;

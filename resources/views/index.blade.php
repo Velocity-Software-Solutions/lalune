@@ -188,8 +188,9 @@
                                         <h3 class="text-base sm:text-lg montserrat-bold text-charcoal tracking-wide"
                                             x-text="item.name"></h3>
 
-                                        <p class="mt-1 text-sm sm:text-[15px] text-charcoal/90 font-mono"
-                                            x-text="truncate(item.description, 90)"></p>
+                                        <p class="mt-1 text-sm sm:text-[15px] text-charcoal/90 font-mono line-clamp-3"
+                                            x-html="item.description">
+                                        </p>
 
                                         <div class="flex items-center justify-between mt-3">
                                             <template x-if="item.discount_price">

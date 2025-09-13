@@ -64,7 +64,7 @@
                     @if ($product->description)
                         <h2 class="mb-2 text-2xl font-bold text-charcoal">{{ __('product.description') }}</h2>
                         <p class="min-h-[2rem] w-full text-sm">
-                            {{ $product->description }}
+                            {!! $product->description !!}
                         </p>
                     @endif
 
