@@ -24,31 +24,15 @@
     <div class="min-h-screen py-3" x-data="{ showModal: false, modalImage: '' }">
         <div x-data="productPage(@js([
     'images' => $product->images
-        ->flatMap(function ($img) use ($product) {
-            $hex = $img->color_code ? strtoupper($img->color_code) : null;
-
-            // If image has no color, duplicate it for all colors
-            if (!$hex && $product->colors->count() > 0) {
-                return $product->colors->map(function ($c) use ($img) {
-                    return [
-                        'src' => asset('storage/' . $img->image_path),
-                        'alt' => $img->alt_text ?? __('product.image_alt'),
-                        'colorHex' => strtoupper($c->color_code),
-                    ];
-                });
-            }
-
-            // Normal case: keep as-is
+        ->map(function ($img) {
             return [
-                [
-                    'src' => asset('storage/' . $img->image_path),
-                    'alt' => $img->alt_text ?? __('product.image_alt'),
-                    'colorHex' => $hex,
-                ],
+                // if you have $img->id, pass it too (optional but nice)
+                'src' => asset('storage/' . $img->image_path),
+                'alt' => $img->alt_text ?? __('product.image_alt'),
+                'colorHex' => $img->color_code ? strtoupper($img->color_code) : null, // null means "works for all colors"
             ];
         })
         ->values(),
-
     'colors' => $product->colors
         ->map(
             fn($c) => [
@@ -222,55 +206,55 @@
             </div>
         </div>
 
-    <div>
-        @if ($smiliarProducts->isNotEmpty())
-            <h1 class="text-3xl montaga-regular m-6 mt-24">
-                {{ __('product.more_like_this') }}
-            </h1>
-        @endif
+        <div>
+            @if ($smiliarProducts->isNotEmpty())
+                <h1 class="text-3xl montaga-regular m-6 mt-24">
+                    {{ __('product.more_like_this') }}
+                </h1>
+            @endif
 
-        <div class="flex flex-wrap gap-5 m-5">
-            @foreach ($smiliarProducts as $sp)
-                <div
-                    class="overflow-hidden !transition bg-white rounded-lg shadow-md !duration-500 hover:shadow-2xl fade-up w-[250px]">
-                    @if ($sp->images->count())
-                        <div
-                            class="relative flex justify-center items-center w-full h-[300px] overflow-hidden rounded-t-md p-1">
-                            <img class="h-full object-contain cursor-zoom-in rounded-md" alt="{{ $sp->name }}"
-                                src="{{ asset('storage/' . $sp->images->first()->image_path) }}"
-                                @click="showModal = true; modalImage = '{{ asset('storage/' . $sp->images->first()->image_path) }}'">
+            <div class="flex flex-wrap gap-5 m-5">
+                @foreach ($smiliarProducts as $sp)
+                    <div
+                        class="overflow-hidden !transition bg-white rounded-lg shadow-md !duration-500 hover:shadow-2xl fade-up w-[250px]">
+                        @if ($sp->images->count())
+                            <div
+                                class="relative flex justify-center items-center w-full h-[300px] overflow-hidden rounded-t-md p-1">
+                                <img class="h-full object-contain cursor-zoom-in rounded-md" alt="{{ $sp->name }}"
+                                    src="{{ asset('storage/' . $sp->images->first()->image_path) }}"
+                                    @click="showModal = true; modalImage = '{{ asset('storage/' . $sp->images->first()->image_path) }}'">
 
-                        </div>
-                    @endif
+                            </div>
+                        @endif
 
-                    <div class="p-4">
-                        <h3 class="text-lg font-semibold text-charcoal">
-                            {{ app()->getLocale() === 'ar' && $sp->name_ar ? $sp->name_ar : $sp->name }}
-                        </h3>
-                        <p
-                            class="mt-1 text-gray-600 w-min"{{ Str::limit(app()->getLocale() === 'ar' && $sp->description_ar ? $sp->description_ar : $sp->description, 80) }}</p>
-                        <div class="flex items-center justify-between mt-2">
-                            <span class="text-xl font-bold text-gray-600">
-                                {{ __('product.currency_aed') }} {{ number_format($sp->price, 2) }}
-                            </span>
-                            <a href="{{ route('products.show', $sp->id) }}"
-                                class="inline-block px-3 py-1 text-white transition bg-gray-600 rounded hover:bg-gray-700">
-                                {{ __('product.view') }}
-                            </a>
+                        <div class="p-4">
+                            <h3 class="text-lg font-semibold text-charcoal">
+                                {{ app()->getLocale() === 'ar' && $sp->name_ar ? $sp->name_ar : $sp->name }}
+                            </h3>
+                            <p
+                                class="mt-1 text-gray-600 w-min"{{ Str::limit(app()->getLocale() === 'ar' && $sp->description_ar ? $sp->description_ar : $sp->description, 80) }}</p>
+                            <div class="flex items-center justify-between mt-2">
+                                <span class="text-xl font-bold text-gray-600">
+                                    {{ __('product.currency_aed') }} {{ number_format($sp->price, 2) }}
+                                </span>
+                                <a href="{{ route('products.show', $sp->id) }}"
+                                    class="inline-block px-3 py-1 text-white transition bg-gray-600 rounded hover:bg-gray-700">
+                                    {{ __('product.view') }}
+                                </a>
+                            </div>
                         </div>
                     </div>
-                </div>
-            @endforeach
+                @endforeach
+            </div>
         </div>
-    </div>
-    <div x-cloak x-show="showModal" x-transition
-        class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
-        @keydown.escape.window="showModal = false" role="dialog">
-        <div class="relative max-w-full max-h-screen">
-            <img @click.outside="showModal = false" :src="modalImage"
-                class="max-w-full max-h-[90vh] rounded shadow-xl" alt="">
+        <div x-cloak x-show="showModal" x-transition
+            class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+            @keydown.escape.window="showModal = false" role="dialog">
+            <div class="relative max-w-full max-h-screen">
+                <img @click.outside="showModal = false" :src="modalImage"
+                    class="max-w-full max-h-[90vh] rounded shadow-xl" alt="">
+            </div>
         </div>
-    </div>
     </div>
     </div>
 
@@ -302,10 +286,15 @@
                 intervalId: null,
 
                 get displayImages() {
-                    if (!this.selectedColorHex) return this.images;
-                    const filtered = this.images.filter(img => (img.colorHex || null) === this.selectedColorHex);
-                    return filtered.length ? filtered : this.images;
+                    if (!this.selectedColorHex) {
+                        return this.images; // no selection → show all (no duplicates)
+                    }
+                    // selection → show matching color + no-color images
+                    return this.images.filter(img =>
+                        (img.colorHex || null) === this.selectedColorHex || img.colorHex == null
+                    );
                 },
+
 
                 initSelections() {
                     if (this.colors.length === 1) {
