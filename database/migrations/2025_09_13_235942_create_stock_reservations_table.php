@@ -27,9 +27,9 @@ return new class extends Migration
             $table->timestamps();
 
             // Helpful indexes
-            $table->index(['product_stock_id', 'is_active', 'expires_at']);
-            $table->index(['product_id', 'is_active', 'expires_at']);
-            $table->index(['session_key', 'is_active']);
+            $table->index(['product_stock_id', 'status', 'expires_at']);
+            $table->index(['product_id', 'status', 'expires_at']);
+            $table->index(['session_key', 'status']);
         });
     }
 
