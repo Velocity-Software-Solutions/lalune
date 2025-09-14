@@ -39,6 +39,35 @@
     $discountPct    = $discountPromo && ($discountPromo['type'] ?? '') === 'percentage'
                         ? (float) ($discountPromo['percent'] ?? 0)
                         : null;
+
+    // ---------- NEW: prefetch color/size labels for all items ----------
+    $items = $order->items ?? collect();
+
+    $colorIds = collect($items)->flatMap(function($it){
+        $snap = (array) ($it->snapshot ?? []);
+        $v    = (array) ($snap['variant'] ?? []);
+        return [
+            (int) ($v['color_id'] ?? $snap['color_id'] ?? $it->color_id ?? 0)
+        ];
+    })->filter()->unique()->values();
+
+    $sizeIds = collect($items)->flatMap(function($it){
+        $snap = (array) ($it->snapshot ?? []);
+        $v    = (array) ($snap['variant'] ?? []);
+        return [
+            (int) ($v['size_id'] ?? $snap['size_id'] ?? $it->size_id ?? 0)
+        ];
+    })->filter()->unique()->values();
+
+    $colorMeta = \App\Models\ProductColor::query()
+        ->whereIn('id', $colorIds)
+        ->get(['id','name','color_code'])
+        ->keyBy('id'); // id => model
+
+    $sizeMeta = \App\Models\ProductSize::query()
+        ->whereIn('id', $sizeIds)
+        ->pluck('size','id'); // id => "M"
+    // -------------------------------------------------------------------
 @endphp
 
 <div class="min-h-screen bg-gray-50 py-10" dir="{{ $dir }}">
@@ -94,7 +123,7 @@
       </div>
     </div>
 
-    {{-- Promotions (if any) --}}
+    {{-- Promotions --}}
     <div class="mt-6">
       <div class="bg-white rounded-2xl shadow p-5">
         <div class="flex items-center justify-between">
@@ -113,7 +142,6 @@
                 $amountCents = (int) ($p['amount_cents'] ?? 0);
                 $percent = $p['percent'] ?? null;
               @endphp
-
               <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2">
                   @if($type === 'shipping')
@@ -169,20 +197,39 @@
           <tbody class="divide-y divide-gray-100 bg-white">
 @foreach ($order->items as $item)
   @php
-      // Snapshot fields
-      $snap  = (array) ($item->snapshot ?? []);
-      $thumb = $snap['image_url'] ?? null;
+      // Snapshot + variant IDs
+      $snap    = (array) ($item->snapshot ?? []);
+      $variant = (array) ($snap['variant'] ?? []);
+      $thumb   = $snap['image_url'] ?? null;
 
-      $colorFromSnap = $snap['color'] ?? $snap['color_code'] ?? null;
-      $sizeFromSnap  = $snap['size']  ?? null;
+      $colorId = $variant['color_id'] ?? $snap['color_id'] ?? $item->color_id ?? null;
+      $sizeId  = $variant['size_id']  ?? $snap['size_id']  ?? $item->size_id  ?? null;
 
-      $colorCode = $colorFromSnap ?: ($item->color_code ?? null);
-      $sizeVal   = $sizeFromSnap  ?: ($item->size ?? null);
-      if ($colorCode && !str_starts_with($colorCode, '#') && preg_match('/^[0-9A-Fa-f]{6}$/', $colorCode)) {
-          $colorCode = '#'.$colorCode;
+      // Resolve color (prefer ID -> DB)
+      $swatchHex = null; $colorLabel = null;
+      if ($colorId && $colorMeta->has($colorId)) {
+          $c = $colorMeta[$colorId];
+          $swatchHex  = strtoupper((string) $c->color_code);
+          $colorLabel = $c->name ?: $swatchHex;
+      } else {
+          // Fallback to hex/name in snapshot or item
+          $hexFromSnap = $snap['color_code'] ?? $snap['color'] ?? $item->color_code ?? null;
+          if ($hexFromSnap && !str_starts_with($hexFromSnap, '#') && preg_match('/^[0-9A-Fa-f]{6}$/', $hexFromSnap)) {
+              $hexFromSnap = '#'.$hexFromSnap;
+          }
+          $swatchHex  = $hexFromSnap ?: null;
+          $colorLabel = $snap['color_name'] ?? $snap['colorLabel'] ?? $swatchHex;
       }
 
-      // Money fields
+      // Resolve size (prefer ID -> DB)
+      $sizeLabel = null;
+      if ($sizeId && $sizeMeta->has($sizeId)) {
+          $sizeLabel = (string) $sizeMeta[$sizeId];
+      } else {
+          $sizeLabel = $snap['size'] ?? $item->size ?? null;
+      }
+
+      // Money
       $unitCents   = (int) ($item->unit_price_cents ?? 0);
       $subCents    = (int) ($item->subtotal_cents ?? ($unitCents * (int) $item->quantity));
       $discCents   = (int) ($item->discount_cents ?? 0);
@@ -199,19 +246,18 @@
             {{ $item->name ?? ($item->product->name ?? __('receipt.deleted_item')) }}
           </div>
 
-          {{-- Variant badges --}}
-          @if($colorCode || $sizeVal)
+          {{-- Variant badges (name + swatch / size) --}}
+          @if($swatchHex || $sizeLabel)
             <div class="mt-1 flex items-center gap-3 text-xs text-gray-600">
-              @if($colorCode)
+              @if($swatchHex)
                 <span class="inline-flex items-center gap-1.5">
-                  <span class="inline-block w-3.5 h-3.5 rounded-full ring-1 ring-gray-300"
-                        style="background: {{ $colorCode }};"></span>
-                  <span>{{ $snap['color_name'] ?? $snap['colorLabel'] ?? strtoupper($colorCode) }}</span>
+                  <span class="inline-block w-3.5 h-3.5 rounded-full ring-1 ring-gray-300" style="background: {{ $swatchHex }};"></span>
+                  <span>{{ $colorLabel }}</span>
                 </span>
               @endif
-              @if($sizeVal)
+              @if($sizeLabel)
                 <span class="inline-flex items-center px-1.5 py-0.5 rounded border border-gray-300 bg-gray-50">
-                  {{ strtoupper($sizeVal) }}
+                  {{ strtoupper($sizeLabel) }}
                 </span>
               @endif
             </div>
@@ -247,24 +293,74 @@
           <tfoot class="bg-gray-50">
             <tr>
               <td colspan="3" class="px-5 py-3 text-right text-gray-600">{{ __('receipt.subtotal') }}</td>
-              <td class="px-5 py-3">{{ $currency }} {{ $fmt($order->subtotal_cents) }}</td>
+              <td class="px-5 py-3 font-medium text-gray-900">
+                {{ $currency }} {{ $fmt($order->subtotal_cents) }}
+              </td>
             </tr>
-            <tr>
-              <td colspan="3" class="px-5 py-3 text-right text-gray-600">{{ __('receipt.discount') }}</td>
-              <td class="px-5 py-3">− {{ $currency }} {{ $fmt($order->discount_cents) }}</td>
-            </tr>
+
+            @if((int)$order->discount_cents > 0)
+              <tr>
+                <td colspan="3" class="px-5 py-3 text-right text-gray-600">{{ __('receipt.discount') }}</td>
+                <td class="px-5 py-3 font-medium text-emerald-700">
+                  − {{ $currency }} {{ $fmt($order->discount_cents) }}
+                  @if($discountPromo)
+                    <span class="ml-2 inline-flex items-center gap-1 text-xs text-emerald-700">
+                      <span class="px-1.5 py-0.5 rounded bg-emerald-100">CODE</span>
+                      <span class="font-mono">{{ strtoupper($discountPromo['code'] ?? '') }}</span>
+                      @if($discountPct) <span>({{ rtrim(rtrim(number_format($discountPct,2), '0'), '.') }}%)</span> @endif
+                    </span>
+                  @endif
+                </td>
+              </tr>
+            @endif
+
             <tr>
               <td colspan="3" class="px-5 py-3 text-right text-gray-600">{{ __('receipt.shipping') }}</td>
-              <td class="px-5 py-3">{{ $currency }} {{ $fmt($order->shipping_cents) }}</td>
+              <td class="px-5 py-3">
+                @if($hasShipPromo && (int)$order->shipping_cents === 0)
+                  <span class="inline-flex items-center gap-2">
+                    <span class="text-emerald-700 font-medium">{{ __('Free') }}</span>
+                    <span class="px-1.5 py-0.5 text-xs rounded bg-emerald-100 text-emerald-800">PROMO</span>
+                  </span>
+                @else
+                  <span class="font-medium text-gray-900">{{ $currency }} {{ $fmt($order->shipping_cents) }}</span>
+                @endif
+              </td>
             </tr>
+
+            @if((int)$order->tax_cents > 0)
+              <tr>
+                <td colspan="3" class="px-5 py-3 text-right text-gray-600">{{ __('receipt.tax') }}</td>
+                <td class="px-5 py-3 font-medium text-gray-900">
+                  {{ $currency }} {{ $fmt($order->tax_cents) }}
+                </td>
+              </tr>
+            @endif
+
             <tr>
-              <td colspan="3" class="px-5 py-3 text-right text-gray-600">{{ __('receipt.tax') }}</td>
-              <td class="px-5 py-3">{{ $currency }} {{ $fmt($order->tax_cents) }}</td>
+              <td colspan="4" class="px-5 pt-2">
+                <div class="h-px bg-gray-200"></div>
+              </td>
             </tr>
-            <tr class="font-semibold">
-              <td colspan="3" class="px-5 py-3 text-right">{{ __('receipt.total') }}</td>
-              <td class="px-5 py-3">{{ $currency }} {{ $fmt($order->total_cents) }}</td>
+
+            <tr class="bg-gray-100">
+              <td colspan="3" class="px-5 py-4 text-right text-gray-900 text-base sm:text-lg font-semibold">
+                Total
+              </td>
+              <td class="px-5 py-4 text-gray-900 text-base sm:text-lg font-semibold">
+                {{ $currency }} {{ $fmt($order->total_cents) }}
+              </td>
             </tr>
+
+            @if((int)$order->discount_cents > 0)
+              <tr>
+                <td colspan="4" class="px-5 pb-4 text-right">
+                  <span class="text-xs text-emerald-700">
+                    {{ __('You saved') }} {{ $currency }} {{ $fmt($order->discount_cents) }}
+                  </span>
+                </td>
+              </tr>
+            @endif
           </tfoot>
         </table>
       </div>

@@ -14,6 +14,22 @@
             </button>
         </form>
 
+        @php
+            // Build lookup maps for all color/size IDs present in the cart (1 query each)
+            $cartColl = collect(session('cart', []));
+            $colorIds = $cartColl->pluck('color_id')->filter()->unique()->values();
+            $sizeIds  = $cartColl->pluck('size_id')->filter()->unique()->values();
+
+            $colorMeta = \App\Models\ProductColor::query()
+                ->whereIn('id', $colorIds)
+                ->get(['id', 'name', 'color_code'])
+                ->keyBy('id'); // id => model
+
+            $sizeMeta = \App\Models\ProductSize::query()
+                ->whereIn('id', $sizeIds)
+                ->pluck('size', 'id'); // id => "M"
+        @endphp
+
         @if (session('cart') && count(session('cart')) > 0)
             <div class="overflow-x-auto">
                 <table class="min-w-full bg-white rounded-lg shadow border border-white/60">
@@ -32,18 +48,80 @@
                             @php
                                 $subtotal = $item['price'] * $item['quantity'];
                                 $total += $subtotal;
+
+                                // Resolve COLOR (prefer IDs → DB labels, fallback to hex in cart)
+                                $swatchHex = null;
+                                $colorLabel = null;
+                                if (!empty($item['color_id']) && $colorMeta->has($item['color_id'])) {
+                                    $c = $colorMeta[$item['color_id']];
+                                    $swatchHex = strtoupper((string) $c->color_code);
+                                    $colorLabel = $c->name ?: $swatchHex;
+                                } else {
+                                    $swatchHex = !empty($item['color']) ? strtoupper((string) $item['color']) : null;
+                                    $colorLabel = $swatchHex;
+                                }
+
+                                // Resolve SIZE (prefer IDs → DB size, fallback to label in cart)
+                                $sizeLabel = null;
+                                if (!empty($item['size_id']) && $sizeMeta->has($item['size_id'])) {
+                                    $sizeLabel = (string) $sizeMeta[$item['size_id']];
+                                } elseif (!empty($item['size'])) {
+                                    $sizeLabel = (string) $item['size'];
+                                }
                             @endphp
+
                             <tr class="border-t">
-                                <td class="flex items-center px-6 py-4 space-x-4">
-                                    <img src="/storage/{{ $item['image_path'] }}" class="object-cover w-12 h-12 rounded"
-                                        alt="">
-                                    <span>{{ $item['name'] }}</span>
+                                <td class="px-6 py-4">
+                                    <div class="flex items-center space-x-4">
+                                        <img src="{{ $item['image_path'] ? asset('storage/' . $item['image_path']) : asset('images/placeholder.png') }}"
+                                            class="object-cover w-12 h-12 rounded" alt="{{ $item['name'] }}" />
+                                        <div>
+                                            <div class="font-medium text-black">{{ $item['name'] }}</div>
+
+                                            {{-- Options row: Color + Size (human-friendly) --}}
+                                            <div class="mt-1 flex items-center gap-4 text-xs text-gray-600">
+                                                {{-- Color swatch/name --}}
+                                                @if ($swatchHex)
+                                                    <span class="inline-flex items-center gap-1.5">
+                                                        <span class="inline-block w-3.5 h-3.5 rounded-full border"
+                                                              style="background: {{ $swatchHex }}"></span>
+                                                        <span>
+                                                            {{ __('Color') }}:
+                                                            <span class="font-medium">
+                                                                {{ $colorLabel }}
+                                                            </span>
+                                                        </span>
+                                                    </span>
+                                                @endif
+
+                                                {{-- Size badge --}}
+                                                @if ($sizeLabel)
+                                                    <span class="inline-flex items-center gap-1.5">
+                                                        <span>{{ __('Size') }}:</span>
+                                                        <span class="px-2 py-0.5 rounded border border-gray-300 text-gray-800 bg-gray-50">
+                                                            {{ strtoupper($sizeLabel) }}
+                                                        </span>
+                                                    </span>
+                                                @endif
+
+                                                @if (!$swatchHex && !$sizeLabel)
+                                                    <span class="text-gray-400">—</span>
+                                                @endif
+                                            </div>
+                                        </div>
+                                    </div>
                                 </td>
-                                <td class="px-6 py-4">{{ __('product.currency_aed') }}
-                                    {{ number_format($item['price'], 2) }}</td>
+
+                                <td class="px-6 py-4">
+                                    {{ __('product.currency_aed') }} {{ number_format($item['price'], 2) }}
+                                </td>
+
                                 <td class="px-6 py-4">{{ $item['quantity'] }}</td>
-                                <td class="px-6 py-4">{{ __('product.currency_aed') }} {{ number_format($subtotal, 2) }}
+
+                                <td class="px-6 py-4">
+                                    {{ __('product.currency_aed') }} {{ number_format($subtotal, 2) }}
                                 </td>
+
                                 <td class="px-6 py-4">
                                     <form method="POST" action="{{ route('cart.remove', urlencode($id)) }}">
                                         @csrf
@@ -52,7 +130,6 @@
                                             {{ __('cart.remove') }}
                                         </button>
                                     </form>
-
                                 </td>
                             </tr>
                         @endforeach
@@ -82,13 +159,11 @@
                 if ($discountPromo) {
                     $type = $discountPromo['discount_type'] ?? '';
                     if ($type === 'fixed') {
-                        // Prefer an explicit amount; fall back to 'value'
                         $discountAmount = (float) ($discountPromo['amount'] ?? ($discountPromo['value'] ?? 0.0));
                     } elseif ($type === 'percentage') {
                         $percent = (float) ($discountPromo['percent'] ?? ($discountPromo['value'] ?? 0.0));
                         $discountAmount = round($itemsSubtotal * ($percent / 100), 2);
                     }
-                    // Never discount more than items subtotal
                     $discountAmount = min($discountAmount, $itemsSubtotal);
                 }
 
@@ -104,7 +179,6 @@
                     $promoAmountsByCode[$discountPromo['code']] = $discountAmount;
                 }
             @endphp
-
 
             <div class="mt-8 grid grid-cols-1 gap-6 md:grid-cols-12">
 

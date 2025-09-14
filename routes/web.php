@@ -75,6 +75,7 @@ Route::get('/checkout', [CheckoutController::class, 'index'])->name('checkout.in
 Route::post('/checkout', [CheckoutController::class, 'process'])->name('checkout.process');
 
 // Order confirmation & rating
+
 Route::get('/order/confirmation', [CheckoutController::class, 'confirmation'])->name('checkout.confirmation');
 Route::post('/order/confirmation/rate', [CheckoutController::class, 'rate'])->name('checkout.rate');
 

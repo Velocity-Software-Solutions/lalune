@@ -165,7 +165,7 @@
                                 <div>
                                     <template x-if="item.images && item.images.length">
                                         <div x-data="{ current: 0 }"
-                                            class="relative flex justify-center items-center w-full h-[260px] sm:h-[300px] overflow-hidden rounded-t-md p-2 bg-white">
+                                            class="relative flex justify-center items-center w-full h-[300px] overflow-hidden rounded-t-md p-2 bg-white">
                                             <template x-for="(img, index) in item.images" :key="index">
                                                 <img x-show="current === index" x-transition
                                                     :src="`${storageBase}/${img.path}`"

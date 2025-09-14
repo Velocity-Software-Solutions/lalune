@@ -38,7 +38,35 @@
       $key = $map[$v] ?? 'default';
       return $classes[$key] ?? $classes['default'];
   };
+  // --- Prefetch color/size meta for all items to avoid N+1 queries ---
+  $items    = $order->items ?? collect();
+
+  $colorIds = $items->map(function($it){
+      $snap = (array) ($it->snapshot ?? []);
+      return $snap['color_id']
+          ?? data_get($snap, 'variant.color_id')
+          ?? ($it->color_id ?? null);
+  })->filter()->unique()->values();
+
+  $sizeIds  = $items->map(function($it){
+      $snap = (array) ($it->snapshot ?? []);
+      return $snap['size_id']
+          ?? data_get($snap, 'variant.size_id')
+          ?? ($it->size_id ?? null);
+  })->filter()->unique()->values();
+
+  // id => {id, name, color_code}
+  $colorMeta = \App\Models\ProductColor::query()
+      ->whereIn('id', $colorIds)
+      ->get(['id','name','color_code'])
+      ->keyBy('id');
+
+  // id => "M"
+  $sizeMeta  = \App\Models\ProductSize::query()
+      ->whereIn('id', $sizeIds)
+      ->pluck('size','id');
 @endphp
+
 
 <div class="h-full max-h-full p-6 mx-3 overflow-auto bg-white rounded-2xl shadow-md dark:bg-gray-800">
 
@@ -260,6 +288,30 @@
               $color = $snap['color'] ?? data_get($snap, 'variant.color');
               $size  = $snap['size']  ?? data_get($snap, 'variant.size');
               $thumb = data_get($snap, 'image_url'); // if you saved one
+                // Resolve color name + swatch via IDs (fallback to hex/text)
+  $resolvedColorId = $snap['color_id'] ?? data_get($snap, 'variant.color_id') ?? ($item->color_id ?? null);
+  $swatchHex = null; $colorName = null;
+
+  if ($resolvedColorId && $colorMeta->has($resolvedColorId)) {
+      $c         = $colorMeta[$resolvedColorId];
+      $swatchHex = $c->color_code ? strtoupper($c->color_code) : null;
+      $colorName = $c->name ?: $swatchHex;
+  } else {
+      // fallback: use any color name saved; else hex
+      $colorName = $snap['color_name']
+          ?? data_get($snap, 'variant.color_name')
+          ?? ($color ?: null);
+      // also try to render a swatch if hex present
+      $hex = $snap['color_code'] ?? $color;
+      if ($hex && !str_starts_with($hex, '#') && preg_match('/^[0-9A-Fa-f]{6}$/', $hex)) $hex = '#'.$hex;
+      $swatchHex = $hex;
+  }
+
+  // Resolve size label via ID (fallback to raw)
+  $resolvedSizeId = $snap['size_id'] ?? data_get($snap, 'variant.size_id') ?? ($item->size_id ?? null);
+  $sizeLabel = $resolvedSizeId && $sizeMeta->has($resolvedSizeId)
+      ? (string) $sizeMeta[$resolvedSizeId]
+      : ($size ?? ($item->size ?? null));
             @endphp
             <tr class="text-gray-900 dark:text-gray-100">
               <td class="px-5 py-4">
@@ -275,12 +327,36 @@
                   </div>
                 </div>
               </td>
-              <td class="px-5 py-4">
-                <div class="text-xs text-gray-600 dark:text-gray-300 space-y-0.5">
-                  <div>Color: <span class="font-medium">{{ $color ?: '—' }}</span></div>
-                  <div>Size:  <span class="font-medium">{{ $size  ?: '—' }}</span></div>
-                </div>
-              </td>
+<td class="px-5 py-4">
+  <div class="text-xs text-gray-600 dark:text-gray-300 space-y-1.5">
+    <div class="flex items-center gap-2">
+      <span>Color:</span>
+      @if($colorName)
+        <span class="inline-flex items-center gap-1.5 font-medium">
+          @if($swatchHex)
+            <span class="inline-block w-3.5 h-3.5 rounded-full ring-1 ring-gray-300 dark:ring-gray-600"
+                  style="background: {{ $swatchHex }}" title="{{ $swatchHex }}"></span>
+          @endif
+          <span>{{ $colorName }}</span>
+        </span>
+      @else
+        <span class="text-gray-400">—</span>
+      @endif
+    </div>
+
+    <div class="flex items-center gap-2">
+      <span>Size:</span>
+      @if($sizeLabel)
+        <span class="px-2 py-0.5 rounded border border-gray-300 bg-gray-50 dark:border-gray-600 dark:bg-gray-800 font-medium">
+          {{ strtoupper($sizeLabel) }}
+        </span>
+      @else
+        <span class="text-gray-400">—</span>
+      @endif
+    </div>
+  </div>
+</td>
+
               <td class="px-5 py-4 text-right">{{ (int) $item->quantity }}</td>
               <td class="px-5 py-4 text-right">{{ $currency }} {{ $fmt($item->unit_price_cents) }}</td>
               <td class="px-5 py-4 text-right">{{ $currency }} {{ $fmt($item->subtotal_cents) }}</td>

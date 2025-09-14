@@ -5,12 +5,15 @@ namespace App\Http\Controllers;
 use App\Mail\OrderConfirmationMail;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\Product;
 use App\Models\ShippingOption;
+use App\Services\InventoryService;
 use App\Services\StallionRates;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Barryvdh\DomPDF\Facade\Pdf; // at the top of the file
+use Log;
 use Stripe\StripeClient;
 use User;
 
@@ -119,13 +122,150 @@ class CheckoutController extends Controller
             'billing_address' => 'nullable|string',
         ]);
 
+        // 1) Load cart
         $cart = session('cart', []);
         if (empty($cart)) {
             return redirect()->route('checkout.index')->with('error', 'Your cart is empty.');
         }
 
+        // 2) Re-validate inventory & price against DB (no writes here, just verify)
+        $productIds = array_values(array_unique(array_map(fn($row) => (int) ($row['product_id'] ?? 0), $cart)));
+        $products = Product::with(['stock', 'colors', 'sizes'])
+            ->whereIn('id', $productIds)->get()->keyBy('id');
+
+        $changes = [];    // human messages
+        $modified = false;
+
+        foreach ($cart as $key => &$line) {
+            $pid = (int) ($line['product_id'] ?? 0);
+            $qty = max(1, (int) ($line['quantity'] ?? 1));
+            $p = $products->get($pid);
+
+            if (!$p || (int) $p->status !== 1) {
+                unset($cart[$key]);
+                $modified = true;
+                $changes[] = "Removed “{$line['name']}” (no longer available).";
+                continue;
+            }
+
+            // Current canonical unit price
+            $currentUnit = $p->discount_price !== null && $p->discount_price >= 0
+                ? (float) $p->discount_price
+                : (float) $p->price;
+
+            // Map to variant if any
+            $hasColors = $p->colors->isNotEmpty();
+            $hasSizes = $p->sizes->isNotEmpty();
+
+            $selectedHex = isset($line['color']) && $line['color'] ? strtoupper((string) $line['color']) : null;
+            $selectedSize = isset($line['size']) && $line['size'] ? (string) $line['size'] : null;
+
+            $variant = null;
+
+            // Prefer product_stock_id if you saved it in the cart
+            if (!empty($line['product_stock_id'])) {
+                $variant = $p->stock->firstWhere('id', (int) $line['product_stock_id']);
+            } elseif ($hasColors || $hasSizes) {
+                // Map hex & size name to IDs
+                $colorId = null;
+                if ($hasColors && $selectedHex) {
+                    $color = $p->colors->firstWhere('color_code', $selectedHex);
+                    $colorId = $color?->id;
+                }
+                $sizeId = null;
+                if ($hasSizes && $selectedSize) {
+                    $size = $p->sizes->firstWhere('size', $selectedSize);
+                    $sizeId = $size?->id;
+                }
+
+                if ($hasColors || $hasSizes) {
+                    $variant = $p->stock->first(function ($row) use ($colorId, $sizeId) {
+                        return (int) $row->color_id === (int) $colorId
+                            && (int) $row->size_id === (int) $sizeId;
+                    });
+                }
+            }
+
+            // Determine available units
+            $available = $variant ? (int) $variant->quantity_on_hand
+                : (int) $p->stock_quantity;
+
+            if ($available <= 0) {
+                unset($cart[$key]);
+                $modified = true;
+                $changes[] = "Removed “{$line['name']}” (out of stock).";
+                continue;
+            }
+
+            // Clamp requested qty to available
+            if ($qty > $available) {
+                $line['quantity'] = $available;
+                $modified = true;
+                $changes[] = "Updated “{$line['name']}” to {$available} (limited stock).";
+            }
+
+            // Update unit price if changed
+            if (!isset($line['price']) || (float) $line['price'] !== $currentUnit) {
+                $line['price'] = $currentUnit;
+                $modified = true;
+                $changes[] = "Updated price for “{$line['name']}”.";
+            }
+
+            // Sync variant id into cart for downstream checks
+            if ($variant && empty($line['product_stock_id'])) {
+                $line['product_stock_id'] = $variant->id;
+                $modified = true;
+            }
+        }
+        unset($line); // break reference
+
+        // If we changed the cart, save and send user back to review
+        if ($modified) {
+            // Remove any now-empty lines just in case
+            $cart = array_filter($cart, fn($row) => isset($row['quantity']) && (int) $row['quantity'] > 0);
+            if (empty($cart)) {
+                session()->forget('cart');
+                return redirect()->route('cart.index')->with('error', 'All items in your cart became unavailable.');
+            }
+            session()->put('cart', $cart);
+            // Show a single consolidated warning
+            $msg = implode(' ', $changes);
+            return redirect()->route('cart.index')->with('warning', $msg ?: 'We updated your cart based on current stock and prices.');
+        }
+
+        $sessionKey = $request->session()->getId();
+        $userId = auth()->id();
+
+        // Reserve (15 minutes)
+        $result = InventoryService::reserveCart(session('cart', []), $sessionKey, $userId, 15);
+
+        // If cart changed (clamped/removed lines), save + send back to review
+        if ($result['cartModified']) {
+            if (empty($result['cart'])) {
+                session()->forget('cart');
+                return redirect()->route('cart.index')->with('error', 'All items became unavailable.');
+            }
+            session()->put('cart', $result['cart']);
+            return redirect()->route('cart.index')->with('warning', implode(' ', $result['changes']));
+        }
+
+        // Save cart back just in case
+        session()->put('cart', $result['cart']);
+
+        // … continue building Stripe line_items as you already do …
+
+        // Add reservation IDs to metadata so the webhook can commit them
+        $reservationIdsCsv = implode(',', $result['reservation_ids']);
+        $params['metadata']['reservation_ids'] = $reservationIdsCsv;
+        $params['payment_intent_data']['metadata']['reservation_ids'] = $reservationIdsCsv;
+
+        // (Optional, show expiry to user)
+        $params['metadata']['reservation_expires_at'] = $result['expires_at']->toIso8601String();
+        $params['payment_intent_data']['metadata']['reservation_expires_at'] = $result['expires_at']->toIso8601String();
+
+        // 3) From here, your original totals/promo/Stripe logic — unchanged, but using the (possibly) updated $cart
         // ---- Normalize promos from session into ['shipping'=>..., 'discount'=>...]
-        $promosRaw = session('promos', []); // could be assoc by code or a list
+        $promosRaw = session('promos', []);
         $promosRaw = is_array($promosRaw) ? $promosRaw : [];
         $shippingPromo = null;
         $discountPromo = null;
@@ -146,6 +286,7 @@ class CheckoutController extends Controller
         // --- Build item subtotals (in cents)
         $items = [];
         $itemsSubtotalCents = 0;
+
         foreach ($cart as $item) {
             $unitCents = (int) round(((float) $item['price']) * 100);
             $qty = (int) $item['quantity'];
@@ -156,7 +297,14 @@ class CheckoutController extends Controller
                 'unit_cents' => $unitCents,
                 'qty' => $qty,
                 'line_cents' => $lineCents,
+                'meta' => [
+                    'product_id' => (int) ($item['product_id'] ?? 0),
+                    'product_stock_id' => (int) ($item['product_stock_id'] ?? 0),
+                    'color_id' => (int) ($item['color_id'] ?? 0),
+                    'size_id' => (int) ($item['size_id'] ?? 0),
+                ],
             ];
+
             $itemsSubtotalCents += $lineCents;
         }
 
@@ -165,11 +313,10 @@ class CheckoutController extends Controller
         $hasFreeShipping = !empty($promos['shipping']);
         $shippingCents = $hasFreeShipping ? 0 : $shippingCentsDefault;
 
-        // --- Discount (non-shipping)
+        // --- Discount
         $discountPromo = $promos['discount'] ?? null;
         $discountCents = 0;
         if ($discountPromo) {
-            // Prefer a precomputed amount (money) if present (from applyPromo)
             if (isset($discountPromo['amount'])) {
                 $discountCents = max(0, (int) round(((float) $discountPromo['amount']) * 100));
             } elseif (($discountPromo['discount_type'] ?? null) === 'percentage') {
@@ -197,33 +344,41 @@ class CheckoutController extends Controller
 
             $newLine = max(0, $row['line_cents'] - $share);
             if ($newLine === 0) {
-                // skip fully discounted items from Stripe line_items
-                continue;
+                continue; // skip fully discounted items
             }
 
             $newUnit = $row['qty'] > 0 ? (int) floor($newLine / $row['qty']) : 0;
             $unitSum = $newUnit * $row['qty'];
             $remainder = $newLine - $unitSum;
             if ($remainder > 0 && $row['qty'] > 0) {
-                $newUnit += 1; // bump by 1 cent to match line
+                $newUnit += 1;
                 if (($newUnit * $row['qty']) > $newLine) {
                     $newUnit = (int) floor($newLine / $row['qty']);
                 }
             }
             $newUnit = max(0, $newUnit);
 
+            // Optionally include per-line metadata so you can reconcile items on webhook
             $adjustedLineItems[] = [
                 'price_data' => [
                     'currency' => 'cad',
-                    'product_data' => ['name' => $row['name']],
+                    'product_data' => [
+                        'name' => $row['name'],
+                        'metadata' => array_filter([
+                            'product_id' => (string) ($row['meta']['product_id'] ?? ''),
+                            'product_stock_id' => (string) ($row['meta']['product_stock_id'] ?? ''),
+                            'color_id' => (string) ($row['meta']['color_id'] ?? ''),
+                            'size_id' => (string) ($row['meta']['size_id'] ?? ''),
+                        ]),
+                    ],
                     'unit_amount' => $newUnit,
                 ],
                 'quantity' => $row['qty'],
             ];
+
         }
 
         if (empty($adjustedLineItems)) {
-            // Edge: everything discounted to zero; keep a minimal line
             $any = $items[0] ?? null;
             if ($any) {
                 $adjustedLineItems[] = [
@@ -238,7 +393,6 @@ class CheckoutController extends Controller
             }
         }
 
-        // Shipping line
         if ($shippingCents > 0) {
             $adjustedLineItems[] = [
                 'price_data' => [
@@ -277,7 +431,7 @@ class CheckoutController extends Controller
         if (!empty($promos['discount'])) {
             $promosMeta['promo_discount_code'] = $promos['discount']['code'] ?? null;
             $promosMeta['promo_discount_type'] = $promos['discount']['discount_type'] ?? null;
-            $promosMeta['promo_discount_amount'] = (string) $discountCents; // cents
+            $promosMeta['promo_discount_amount'] = (string) ($discountCents ?? 0);
             if (($promos['discount']['discount_type'] ?? null) === 'percentage') {
                 $promosMeta['promo_discount_percent'] = (string) ($promos['discount']['percent'] ?? $promos['discount']['value'] ?? '');
             }
@@ -303,7 +457,7 @@ class CheckoutController extends Controller
             }
         }
 
-        $stripe = new \Stripe\StripeClient(env('STRIPE_SECRET'));
+        $stripe = new StripeClient(env('STRIPE_SECRET'));
         $session = $stripe->checkout->sessions->create($params);
 
         return redirect()->away($session->url);
@@ -315,17 +469,23 @@ class CheckoutController extends Controller
         $sessionId = $request->query('session_id');
         abort_unless($sessionId, 404);
 
-        $stripe = new \Stripe\StripeClient(env('STRIPE_SECRET'));
+        $stripe = new StripeClient(env('STRIPE_SECRET'));
         $session = $stripe->checkout->sessions->retrieve($sessionId, ['expand' => ['payment_intent', 'customer']]);
 
         if ($session->payment_status !== 'paid') {
             return redirect()->route('checkout.index')->with('error', 'Payment not completed.');
         }
 
+        // Expand price.product so we can read product metadata (color/size/image_url)
         // stripe-php < 14:
-        $lineItems = $stripe->checkout->sessions->allLineItems($sessionId, ['limit' => 100]);
-        // stripe-php ^14: $lineItems = $stripe->checkout->sessions->listLineItems($sessionId, ['limit' => 100]);
+        $lineItems = $stripe->checkout->sessions->allLineItems($sessionId, [
+            'limit' => 100,
+            'expand' => ['data.price.product'],
+        ]);
+        // stripe-php ^14 would be:
+        // $lineItems = $stripe->checkout->sessions->listLineItems($sessionId, ['limit' => 100, 'expand' => ['data.price.product']]);
 
+        // Merge metadata from PI and Session
         $piMetaArr = $session->payment_intent && $session->payment_intent->metadata
             ? $session->payment_intent->metadata->toArray() : [];
         $seMetaArr = $session->metadata ? $session->metadata->toArray() : [];
@@ -335,6 +495,23 @@ class CheckoutController extends Controller
                 ? $piMetaArr[$key]
                 : (array_key_exists($key, $seMetaArr) ? $seMetaArr[$key] : $default);
         };
+
+        // ---- Commit reservations & release leftovers for this browsing session
+        try {
+            $reservationIdsCsv = (string) ($meta('reservation_ids') ?? '');
+            $reservationIds = array_filter(array_map('intval', array_filter(explode(',', $reservationIdsCsv))));
+            if (!empty($reservationIds)) {
+                InventoryService::commitReservations($reservationIds);
+            }
+        } catch (\Throwable $e) {
+            Log::error('Reservation commit failed on confirmation for session ' . $sessionId . ': ' . $e->getMessage());
+        }
+
+        try {
+            InventoryService::releaseBySession($request->session()->getId());
+        } catch (\Throwable $e) {
+            Log::warning('Releasing holds by session failed: ' . $e->getMessage());
+        }
 
         $cust = $session->customer_details;
         $addr = optional($cust)->address;
@@ -367,7 +544,7 @@ class CheckoutController extends Controller
         $currency = strtoupper($session->currency);
         $totalCents = (int) $session->amount_total;
         $subCents = (int) $session->amount_subtotal;
-        $discCents = (int) (optional($session->total_details)->amount_discount ?? 0);  // Stripe-computed discounts if any
+        $discCents = (int) (optional($session->total_details)->amount_discount ?? 0);
         $shipCents = (int) (optional($session->total_details)->amount_shipping ?? 0);
         $taxCents = (int) (optional($session->total_details)->amount_tax ?? 0);
 
@@ -381,47 +558,70 @@ class CheckoutController extends Controller
             $uidMeta = $meta('user_id');
             if (is_string($uidMeta) && ctype_digit($uidMeta)) {
                 $candidate = (int) $uidMeta;
-                if (User::whereKey($candidate)->exists()) {
+                if (\App\Models\User::whereKey($candidate)->exists()) {
                     $userId = $candidate;
                 }
             }
         }
 
-        // Build snapshot
-        $itemsSnapshot = collect($lineItems->data)->map(fn($li) => [
-            'description' => $li->description,
-            'quantity' => (int) ($li->quantity ?? 1),
-            'amount_total' => (int) ($li->amount_total ?? 0),
-            'amount_subtotal' => (int) ($li->amount_subtotal ?? 0),
-            'currency' => strtoupper($li->currency ?? $currency),
-            'color' => $li->price->product->metadata['color'] ?? null,
-            'size' => $li->price->product->metadata['size'] ?? null,
-        ])->all();
+        // ---- Build an order-level snapshot of the line items including variant info
+        $itemsSnapshot = collect($lineItems->data)->map(function ($li) use ($currency) {
+            // Pull product metadata safely
+            $prodMeta = [];
+            if (isset($li->price, $li->price->product) && is_object($li->price->product) && isset($li->price->product->metadata)) {
+                $prodMeta = $li->price->product->metadata->toArray();
+            }
 
-        // Read promos from metadata (what we sent earlier)
+            // Prefer flat keys, then nested variant.* (matches your later read pattern)
+            $color = $prodMeta['color'] ?? $prodMeta['color_code'] ?? data_get($prodMeta, 'variant.color');
+            $size = $prodMeta['size'] ?? data_get($prodMeta, 'variant.size');
+
+            $imageUrl = $prodMeta['image_url'] ?? null;
+            $colorName = $prodMeta['color_name'] ?? ($prodMeta['colorLabel'] ?? null);
+
+            return [
+                'description' => $li->description,
+                'quantity' => (int) ($li->quantity ?? 1),
+                'amount_total' => (int) ($li->amount_total ?? 0),
+                'amount_subtotal' => (int) ($li->amount_subtotal ?? 0),
+                'currency' => strtoupper($li->currency ?? $currency),
+
+                // Variant info at root
+                'color' => $color,
+                'size' => $size,
+                'color_name' => $colorName,
+                'image_url' => $imageUrl,
+
+                // And under a nested object too (so: $snap['color'] ?? data_get($snap, 'variant.color'))
+                'variant' => [
+                    'color' => $color,
+                    'size' => $size,
+                ],
+            ];
+        })->all();
+
+        // ---- Promos (from our metadata)
         $promosApplied = [];
-        $shippingCode = $meta('promo_shipping_code');
-        if ($shippingCode) {
-            $promosApplied[] = ['code' => $shippingCode, 'type' => 'shipping'];
+        if ($code = $meta('promo_shipping_code')) {
+            $promosApplied[] = ['code' => $code, 'type' => 'shipping'];
         }
-        $discountCode = $meta('promo_discount_code');
-        if ($discountCode) {
+        if ($code = $meta('promo_discount_code')) {
             $promosApplied[] = [
-                'code' => $discountCode,
+                'code' => $code,
                 'type' => $meta('promo_discount_type'),
                 'percent' => $meta('promo_discount_percent'),
                 'amount_cents' => (int) ($meta('promo_discount_amount') ?? 0),
             ];
         }
 
-        $order = Order::firstOrCreate(
+        $order = \App\Models\Order::firstOrCreate(
             ['stripe_session_id' => $sessionId],
             [
                 'user_id' => $userId,
                 'coupon_id' => null,
                 'shipping_option_id' => null,
 
-                'order_number' => 'ORD-' . now()->format('Ymd') . '-' . strtoupper(\Illuminate\Support\Str::random(6)),
+                'order_number' => 'ORD-' . now()->format('Ymd') . '-' . strtoupper(Str::random(6)),
                 'stripe_payment_intent' => $paymentIntentId,
                 'stripe_customer_id' => is_string($session->customer) ? $session->customer : (optional($session->customer)->id ?? null),
 
@@ -431,7 +631,7 @@ class CheckoutController extends Controller
 
                 'currency' => $currency,
                 'subtotal_cents' => $subCents,
-                'discount_cents' => $discCents,    // Stripe’s totals (our item price adjustments already included)
+                'discount_cents' => $discCents,
                 'shipping_cents' => $shipCents,
                 'tax_cents' => $taxCents,
                 'total_cents' => $totalCents,
@@ -451,7 +651,7 @@ class CheckoutController extends Controller
                 'snapshot' => $itemsSnapshot,
                 'metadata' => [
                     'stripe' => ['mode' => $session->mode],
-                    'promos_applied' => $promosApplied, // <-- persist promos used
+                    'promos_applied' => $promosApplied,
                 ],
                 'notes' => null,
             ]
@@ -464,9 +664,21 @@ class CheckoutController extends Controller
                 $lineSub = (int) ($li->amount_subtotal ?? $lineTotal);
                 $unitCents = $qty > 0 ? intdiv($lineSub, $qty) : 0;
 
-                OrderItem::create([
+                $pm = (isset($li->price->product->metadata) && $li->price->product->metadata)
+                    ? $li->price->product->metadata->toArray()
+                    : [];
+
+                $productId = (int) ($pm['product_id'] ?? 0) ?: null;
+                $productStockId = (int) ($pm['product_stock_id'] ?? 0) ?: null;
+                $colorId = (int) ($pm['color_id'] ?? 0) ?: null;
+                $sizeId = (int) ($pm['size_id'] ?? 0) ?: null;
+
+                $colorModel = $colorId ? \App\Models\ProductColor::find($colorId) : null;
+                $sizeModel = $sizeId ? \App\Models\ProductSize::find($sizeId) : null;
+
+                \App\Models\OrderItem::create([
                     'order_id' => $order->id,
-                    'product_id' => null,
+                    'product_id' => $productId, // if you want to persist it
                     'name' => $li->description,
                     'quantity' => $qty,
                     'unit_price_cents' => $unitCents,
@@ -475,52 +687,64 @@ class CheckoutController extends Controller
                     'tax_cents' => 0,
                     'total_cents' => $lineTotal,
                     'currency' => strtoupper($li->currency ?? $currency),
-                    'snapshot' => ['stripe_line_item' => $li],
+
+                    'snapshot' => [
+                        'stripe_line_item' => $li,
+
+                        // IDs
+                        'product_id' => $productId,
+                        'product_stock_id' => $productStockId,
+                        'color_id' => $colorId,
+                        'size_id' => $sizeId,
+
+                        // Friendly labels (useful in views)
+                        'color_name' => $colorModel?->name,
+                        'color_hex' => $colorModel?->color_code,
+                        'size_label' => $sizeModel?->size,
+
+                        // Nested variant too
+                        'variant' => [
+                            'color_id' => $colorId,
+                            'size_id' => $sizeId,
+                            'color_name' => $colorModel?->name,
+                            'size' => $sizeModel?->size,
+                            'color_hex' => $colorModel?->color_code,
+                        ],
+                    ],
                 ]);
             }
 
-            // (Optional) Mark promo usage if you have a PromoCode model
-            if (!empty($promosApplied) && class_exists(PromoCode::class)) {
+
+            // (Optional) promo bookkeeping
+            if (!empty($promosApplied) && class_exists(\App\Models\PromoCode::class)) {
                 foreach ($promosApplied as $applied) {
                     try {
-                        $pc = PromoCode::where('code', $applied['code'])->first();
-                        if ($pc) {
-                            // Safely increment used_count
+                        if ($pc = \App\Models\PromoCode::where('code', $applied['code'])->first()) {
                             $pc->increment('used_count');
-                            // If you have an order_promo pivot, attach it here with amount:
-                            // $order->promoCodes()->attach($pc->id, ['amount_cents' => $applied['amount_cents'] ?? 0]);
                         }
                     } catch (\Throwable $e) {
-                        // Do not block checkout on bookkeeping errors
-                        \Log::warning('Promo usage increment failed: ' . $e->getMessage());
+                        Log::warning('Promo usage increment failed: ' . $e->getMessage());
                     }
                 }
             }
 
-            // Clear cart & promos
+            // clear session cart/promos
             session()->forget(['cart', 'coupon', 'promos']);
         }
 
-
-        // Only email once per order (avoid duplicate emails on refresh)
+        // Only email once
         if (!$order->getAttribute('receipt_emailed_at')) {
             try {
-                // Choose the mailer you want; remove ->mailer('noreply') if you use default
-                Mail::mailer('noreply')
-                    ->to($order->email)
-                    ->send(new OrderConfirmationMail($order));
-
-                // persist a timestamp so we don't resend on page refresh
+                Mail::mailer('noreply')->to($order->email)->send(new \App\Mail\OrderConfirmationMail($order));
                 $order->forceFill(['receipt_emailed_at' => now()])->save();
             } catch (\Throwable $e) {
-                \Log::warning('Order receipt email failed: ' . $e->getMessage());
-                // Do not block the receipt page
+                Log::warning('Order receipt email failed: ' . $e->getMessage());
             }
         }
 
-
         return view('checkout.receipt', compact('order', 'session'));
     }
+
 
 
     // public function rate(StallionRates $stallion, Request $request)

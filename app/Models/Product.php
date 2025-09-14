@@ -33,7 +33,7 @@ class Product extends Model
     {
         return $this->hasMany(ProductImage::class)->orderByDesc('thumbnail')->first();
     }
-    
+
     public function category()
     {
         return $this->belongsTo(Category::class);
@@ -52,4 +52,16 @@ class Product extends Model
     {
         return $this->hasMany(ProductColor::class);
     }
+
+    public function stock()
+    {
+        return $this->hasMany(ProductStock::class, 'product_id');
+    }
+
+        public function reservations()
+    {
+        return $this->hasMany(StockReservation::class)
+                    ->whereNull('product_stock_id');
+    }
+
 }

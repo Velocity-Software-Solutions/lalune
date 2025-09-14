@@ -65,27 +65,111 @@
 
 
         {{-- Cart Items --}}
-        <div class="p-6 mb-6 bg-white rounded-lg shadow border border-white/60">
-            <h2 class="mb-4 text-xl font-semibold text-black">{{ __('checkout.your_cart') }}</h2>
+{{-- Cart Items --}}
+<div class="p-6 mb-6 bg-white rounded-lg shadow border border-white/60">
+    <h2 class="mb-4 text-xl font-semibold text-black">{{ __('checkout.your_cart') }}</h2>
 
-            @if (count($cart) > 0)
-                <ul class="divide-y divide-white/60">
-                    @foreach ($cart as $id => $item)
-                        <li class="flex items-start justify-between py-3">
-                            <div class="pr-4">
-                                <p class="font-medium text-charcoal">{{ $item['name'] }}</p>
-                                <p class="text-sm text-charcoal/70">{{ __('checkout.qty') }}: {{ $item['quantity'] }}</p>
+    @php
+        // Prefetch color/size metadata using IDs saved in session cart
+        $cartArray = $cart ?? session('cart', []);
+        $colorIds  = collect($cartArray)->pluck('color_id')->filter()->unique()->values();
+        $sizeIds   = collect($cartArray)->pluck('size_id')->filter()->unique()->values();
+
+        $colorMeta = \App\Models\ProductColor::query()
+            ->whereIn('id', $colorIds)
+            ->get(['id','name','color_code'])
+            ->keyBy('id'); // id => model
+
+        $sizeMeta = \App\Models\ProductSize::query()
+            ->whereIn('id', $sizeIds)
+            ->pluck('size','id'); // id => "M"
+    @endphp
+
+    @if (count($cartArray) > 0)
+        <ul class="divide-y divide-white/60">
+            @foreach ($cartArray as $key => $item)
+                @php
+                    // Resolve color (prefer ID -> DB, else hex from cart)
+                    $cid       = $item['color_id'] ?? null;
+                    $swatchHex = null;
+                    $colorName = null;
+                    if ($cid && $colorMeta->has($cid)) {
+                        $c         = $colorMeta[$cid];
+                        $swatchHex = $c->color_code ? strtoupper($c->color_code) : null;
+                        $colorName = $c->name ?: $swatchHex;
+                    } else {
+                        $hex = $item['color'] ?? null; // e.g. "#000000" or "000000"
+                        if ($hex && !str_starts_with($hex, '#') && preg_match('/^[0-9A-Fa-f]{6}$/', $hex)) {
+                            $hex = '#'.$hex;
+                        }
+                        $swatchHex = $hex;
+                        $colorName = $hex; // fallback shows hex if no name
+                    }
+
+                    // Resolve size (prefer ID -> DB, else string from cart)
+                    $sid       = $item['size_id'] ?? null;
+                    $sizeLabel = $sid && $sizeMeta->has($sid) ? (string) $sizeMeta[$sid] : ($item['size'] ?? null);
+
+                    $lineTotal = (float) ($item['price'] * $item['quantity']);
+                @endphp
+
+                <li class="flex items-start justify-between py-3">
+                    <div class="flex items-start gap-3 pr-4">
+                        @if (!empty($item['image_path']))
+                            <img
+                                src="{{ asset('storage/'.$item['image_path']) }}"
+                                class="w-12 h-12 rounded object-cover"
+                                alt="{{ $item['name'] }}"
+                            >
+                        @endif
+
+                        <div>
+                            <p class="font-medium text-charcoal">{{ $item['name'] }}</p>
+
+                            {{-- Options row: color name + swatch, size label --}}
+                            <div class="mt-1 flex items-center gap-4 text-xs text-gray-600">
+                                @if ($swatchHex)
+                                    <span class="inline-flex items-center gap-1.5">
+                                        <span class="inline-block w-3.5 h-3.5 rounded-full border"
+                                              style="background: {{ $swatchHex }}"
+                                              title="{{ $swatchHex }}"></span>
+                                        <span>Color: <span class="font-medium">
+                                            {{ $colorName }}
+                                        </span></span>
+                                    </span>
+                                @endif
+
+                                @if ($sizeLabel)
+                                    <span class="inline-flex items-center gap-1.5">
+                                        <span>Size:</span>
+                                        <span class="px-2 py-0.5 rounded border border-gray-300 text-gray-800 bg-gray-50">
+                                            {{ strtoupper($sizeLabel) }}
+                                        </span>
+                                    </span>
+                                @endif
+
+                                @if (empty($swatchHex) && empty($sizeLabel))
+                                    <span class="text-gray-400">—</span>
+                                @endif
                             </div>
-                            <div class="text-charcoal">
-                                CAD {{ number_format($item['price'] * $item['quantity'], 2) }}
-                            </div>
-                        </li>
-                    @endforeach
-                </ul>
-            @else
-                <p class="text-charcoal/70">{{ __('checkout.cart_empty') }}</p>
-            @endif
-        </div>
+
+                            <p class="mt-1 text-sm text-charcoal/70">
+                                {{ __('checkout.qty') }}: {{ $item['quantity'] }}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="text-charcoal">
+                        CAD {{ number_format($lineTotal, 2) }}
+                    </div>
+                </li>
+            @endforeach
+        </ul>
+    @else
+        <p class="text-charcoal/70">{{ __('checkout.cart_empty') }}</p>
+    @endif
+</div>
+
 
         @if ($errors->any())
             <div class="p-4 mb-4 text-red-800 bg-red-100 border border-red-200 rounded">
@@ -102,7 +186,6 @@
             @csrf
 
             {{-- Guest fields --}}
-            @if (!auth()->check())
                 <div>
                     <label for="full_name"
                         class="block text-sm font-medium text-charcoal">{{ __('checkout.full_name') }}</label>
@@ -144,7 +227,6 @@
                         </select>
                     </div>
                 </div>
-            @endif
 
             {{-- Shipping Rates (fixed for now) --}}
             <div class="space-y-3">
