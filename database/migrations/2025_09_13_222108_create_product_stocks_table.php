@@ -37,7 +37,7 @@ return new class extends Migration {
         // Unique combination per product
         DB::statement("
             ALTER TABLE product_stocks
-            ADD CONSTRAINT uq_product_stock_combo UNIQUE (product_id, color_key, size_key)
+            ADD CONSTRAINT uq_product_stock_combo UNIQUE (product_id)
         ");
 
         // Helpful indexes for admin/storefront queries
