@@ -24,14 +24,31 @@
     <div class="min-h-screen py-3" x-data="{ showModal: false, modalImage: '' }">
         <div x-data="productPage(@js([
     'images' => $product->images
-        ->map(
-            fn($img) => [
-                'src' => asset('storage/' . $img->image_path),
-                'alt' => $img->alt_text ?? __('product.image_alt'),
-                'colorHex' => $img->color_code ? strtoupper($img->color_code) : null,
-            ],
-        )
+        ->flatMap(function ($img) use ($product) {
+            $hex = $img->color_code ? strtoupper($img->color_code) : null;
+
+            // If image has no color, duplicate it for all colors
+            if (!$hex && $product->colors->count() > 0) {
+                return $product->colors->map(function ($c) use ($img) {
+                    return [
+                        'src' => asset('storage/' . $img->image_path),
+                        'alt' => $img->alt_text ?? __('product.image_alt'),
+                        'colorHex' => strtoupper($c->color_code),
+                    ];
+                });
+            }
+
+            // Normal case: keep as-is
+            return [
+                [
+                    'src' => asset('storage/' . $img->image_path),
+                    'alt' => $img->alt_text ?? __('product.image_alt'),
+                    'colorHex' => $hex,
+                ],
+            ];
+        })
         ->values(),
+
     'colors' => $product->colors
         ->map(
             fn($c) => [
@@ -60,8 +77,10 @@
                         <!-- Slides -->
                         <template x-for="(img, i) in displayImages" :key="i">
                             <div x-show="index === i" x-transition.opacity.duration.300ms
-                                class="absolute inset-0 flex items-center justify-center justify-self-center w-fit"  @mouseenter="paused = true; hover = true"
-                    @mouseleave="paused = false; hover = false; originX = 50; originY = 50" @mousemove="onMove($event)">
+                                class="absolute inset-0 flex items-center justify-center justify-self-center w-fit"
+                                @mouseenter="paused = true; hover = true"
+                                @mouseleave="paused = false; hover = false; originX = 50; originY = 50"
+                                @mousemove="onMove($event)">
                                 <img :src="img.src" :alt="img.alt"
                                     class="max-w-full max-h-full object-contain select-none pointer-events-none rounded"
                                     draggable="false" :style="imgStyle(i)">
@@ -202,7 +221,6 @@
                 </form>
             </div>
         </div>
-    </div>
 
     <div>
         @if ($smiliarProducts->isNotEmpty())
@@ -245,18 +263,14 @@
             @endforeach
         </div>
     </div>
-    <div x-show="showModal" x-transition x-cloak
-        class="fixed inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center p-4"
-        @keydown.escape.window="showModal = false" role="dialog" :aria-label="`{{ __('shop.image_preview') }}`">
+    <div x-cloak x-show="showModal" x-transition
+        class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+        @keydown.escape.window="showModal = false" role="dialog">
         <div class="relative max-w-full max-h-screen">
-            {{-- <button @click="showModal = false"
-                    class="absolute -top-4 -right-4 flex justify-center items-center bg-white text-black text-2xl w-8 h-8 rounded-full shadow hover:bg-gray-100 z-50"
-                    aria-label="{{ __('shop.close') }}">
-                    <span class="material-icons">close</span>
-                </button> --}}
             <img @click.outside="showModal = false" :src="modalImage"
-                class="max-w-full max-h-[90vh] rounded shadow-xl" :alt="`{{ __('shop.image_preview') }}`">
+                class="max-w-full max-h-[90vh] rounded shadow-xl" alt="">
         </div>
+    </div>
     </div>
     </div>
 
