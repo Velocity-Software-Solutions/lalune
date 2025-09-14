@@ -10,7 +10,8 @@
              bg-cover bg-top bg-no-repeat md:bg-fixed"
         style="background-image:url('{{ asset('images/index-hero.jpg') }}');">
         <!-- Optional overlay -->
-        <div class="w-full h-full bg-black/30 flex flex-col md:flex-row justify-evenly md:justify-between rounded-3xl backdrop:blur-sm px-8 py-2 text-center">
+        <div
+            class="w-full h-full bg-black/30 flex flex-col justify-evenly md:justify-between rounded-3xl backdrop:blur-sm px-8 py-4 text-center">
             <div class="self-center">
                 <h1 class="text-2xl md:text-5xl font-bolder font-serif text-white/90">Made in Canada</h1>
                 <br>
@@ -18,9 +19,9 @@
                         style="font-family:'Dancing Script', cursive;">love & care</span></h3>
             </div>
             <!-- Promo Codes Section -->
-            <div class="space-y-2 text-white/85 text-xs md:text-base montserrat-regular self-end">
+            <div class="space-y-2 text-white/85 text-xs md:text-base montserrat-regular self-center">
                 <p>Free Shipping on CAD 250+ with code <span class="text-white font-semibold">FREESHIP</span></p>
-                <div class="flex space-x-2">
+                <div class="flex space-x-2 lg:space-x-6">
                     <p>Save 10% on CAD 300+ with code <span class="text-white font-semibold">THANKS10</span></p>
                     <p>Save 15% on CAD 400+ with code <span class="text-white font-semibold">THANKS15</span></p>
                     <p>Save 20% on CAD 500+ with code <span class="text-white font-semibold">THANKS20</span></p>
@@ -190,6 +191,8 @@
                                     <template x-if="item.images && item.images.length">
                                         <div x-data="{ current: 0 }"
                                             class="relative flex justify-center items-center w-full h-[300px] overflow-hidden rounded-t-md p-2 bg-white">
+
+                                            <!-- Images -->
                                             <template x-for="(img, index) in item.images" :key="index">
                                                 <img x-show="current === index" x-transition
                                                     :src="`${storageBase}/${img.path}`"
@@ -198,6 +201,20 @@
                                                     :alt="item.name">
                                             </template>
 
+                                            <!-- Prev Arrow -->
+                                            <button
+                                                @click="current = (current - 1 + item.images.length) % item.images.length"
+                                                class="absolute left-2 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/70 text-white rounded-full w-8 h-8 flex justify-center items-center">
+                                                &#10094;
+                                            </button>
+
+                                            <!-- Next Arrow -->
+                                            <button @click="current = (current + 1) % item.images.length"
+                                                class="absolute right-2 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/70 text-white rounded-full w-8 h-8 flex justify-center items-center">
+                                                &#10095;
+                                            </button>
+
+                                            <!-- Dots -->
                                             <div class="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2">
                                                 <template x-for="(img, index) in item.images" :key="index">
                                                     <button @click="current = index"
@@ -206,6 +223,7 @@
                                                 </template>
                                             </div>
                                         </div>
+
                                     </template>
 
                                     <div class="p-3 sm:p-4">

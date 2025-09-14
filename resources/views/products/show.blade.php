@@ -52,28 +52,46 @@
     'stock' => $stockPayload,
     'productTotalQty' => $productTotalQty ?? 0,
 ]))" <div class="grid grid-cols-1 gap-8 md:grid-cols-2 place-items-center">
-
-            {{-- Carousel --}}
-            <div class="relative w-full h-96 rounded-lg overflow-hidden" @mouseenter="paused = true; hover = true"
-                @mouseleave="paused = false; hover = false; originX = 50; originY = 50">
-
-                <!-- Slides (bind to computed displayImages) -->
-                <template x-for="(img, i) in displayImages" :key="i">
-                    <div x-show="index === i" x-transition.opacity.duration.300ms
-                        class="absolute inset-0 flex items-center justify-center" @mousemove="onMove($event)">
-                        <img :src="img.src" :alt="img.alt"
-                            class="max-w-full max-h-full object-contain select-none pointer-events-none" draggable="false"
-                            :style="imgStyle(i)">
+            {{-- Left Panel --}}
+            <div class="w-full h-full">
+                {{-- Carousel --}}
+                <div class="relative w-full h-full rounded-lg overflow-hidden">
+                    <div>
+                        <!-- Slides -->
+                        <template x-for="(img, i) in displayImages" :key="i">
+                            <div x-show="index === i" x-transition.opacity.duration.300ms
+                                class="absolute inset-0 flex items-center justify-center justify-self-center w-fit"  @mouseenter="paused = true; hover = true"
+                    @mouseleave="paused = false; hover = false; originX = 50; originY = 50" @mousemove="onMove($event)">
+                                <img :src="img.src" :alt="img.alt"
+                                    class="max-w-full max-h-full object-contain select-none pointer-events-none rounded"
+                                    draggable="false" :style="imgStyle(i)">
+                            </div>
+                        </template>
                     </div>
-                </template>
+                </div>
 
-                <!-- Dots -->
-                <div class="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-2">
-                    <template x-for="(img, i) in displayImages" :key="'dot_' + i">
-                        <button @click="go(i)" class="w-2.5 h-2.5 rounded-full transition"
-                            :class="i === index ? 'bg-charcoal' : 'bg-gray-300'">
-                        </button>
-                    </template>
+                <!-- Controls under the image -->
+                <div class="flex items-center justify-center gap-6 mt-3">
+                    <!-- Prev Arrow -->
+                    <button @click="index = (index - 1 + displayImages.length) % displayImages.length"
+                        class="bg-black/70 text-white rounded-full w-8 h-8 flex justify-center items-center hover:bg-black">
+                        &#10094;
+                    </button>
+
+                    <!-- Dots -->
+                    <div class="flex items-center gap-2">
+                        <template x-for="(img, i) in displayImages" :key="'dot_' + i">
+                            <button @click="go(i)" class="w-2.5 h-2.5 rounded-full transition"
+                                :class="i === index ? 'bg-black' : 'bg-gray-400'">
+                            </button>
+                        </template>
+                    </div>
+
+                    <!-- Next Arrow -->
+                    <button @click="index = (index + 1) % displayImages.length"
+                        class="bg-black/70 text-white rounded-full w-8 h-8 flex justify-center items-center hover:bg-black">
+                        &#10095;
+                    </button>
                 </div>
             </div>
 
@@ -193,7 +211,7 @@
             </h1>
         @endif
 
-        <div class="flex gap-5 m-5">
+        <div class="flex flex-wrap gap-5 m-5">
             @foreach ($smiliarProducts as $sp)
                 <div
                     class="overflow-hidden !transition bg-white rounded-lg shadow-md !duration-500 hover:shadow-2xl fade-up w-[250px]">
@@ -245,169 +263,198 @@
 
 
     <script>
-function productPage(init) {
-  return {
-    images: Array.isArray(init.images) ? init.images : [],
-    colors: Array.isArray(init.colors) ? init.colors : [],     // [{id,name,hex}]
-    sizes:  Array.isArray(init.sizes)  ? init.sizes  : [],     // [{id,size}]
-    stock:  Array.isArray(init.stock)  ? init.stock  : [],     // [{id,colorId,sizeId,colorHex,size,qty}]
-    productTotalQty: Number.isFinite(init.productTotalQty) ? init.productTotalQty : 0,
+        function productPage(init) {
+            return {
+                images: Array.isArray(init.images) ? init.images : [],
+                colors: Array.isArray(init.colors) ? init.colors : [], // [{id,name,hex}]
+                sizes: Array.isArray(init.sizes) ? init.sizes : [], // [{id,size}]
+                stock: Array.isArray(init.stock) ? init.stock : [], // [{id,colorId,sizeId,colorHex,size,qty}]
+                productTotalQty: Number.isFinite(init.productTotalQty) ? init.productTotalQty : 0,
 
-    // selections (now include ids)
-    selectedColorHex: null,
-    selectedColorId:  null,   // NEW
-    selectedSize:     null,
-    selectedSizeId:   null,   // NEW
-    qty: 1,
+                // selections (now include ids)
+                selectedColorHex: null,
+                selectedColorId: null, // NEW
+                selectedSize: null,
+                selectedSizeId: null, // NEW
+                qty: 1,
 
-    // carousel state...
-    index: 0, paused:false, hover:false, zoom:2, originX:50, originY:50, intervalId:null,
+                // carousel state...
+                index: 0,
+                paused: false,
+                hover: false,
+                zoom: 2,
+                originX: 50,
+                originY: 50,
+                intervalId: null,
 
-    get displayImages() {
-      if (!this.selectedColorHex) return this.images;
-      const filtered = this.images.filter(img => (img.colorHex || null) === this.selectedColorHex);
-      return filtered.length ? filtered : this.images;
-    },
+                get displayImages() {
+                    if (!this.selectedColorHex) return this.images;
+                    const filtered = this.images.filter(img => (img.colorHex || null) === this.selectedColorHex);
+                    return filtered.length ? filtered : this.images;
+                },
 
-    initSelections() {
-      if (this.colors.length === 1) {
-        const c = this.colors[0];
-        this.selectedColorHex = c.hex;
-        this.selectedColorId  = c.id;
-      }
-      if (this.sizes.length === 1) {
-        const s = this.sizes[0];
-        this.selectedSize   = s.size;
-        this.selectedSizeId = s.id;
-      }
-      this.start();
-    },
+                initSelections() {
+                    if (this.colors.length === 1) {
+                        const c = this.colors[0];
+                        this.selectedColorHex = c.hex;
+                        this.selectedColorId = c.id;
+                    }
+                    if (this.sizes.length === 1) {
+                        const s = this.sizes[0];
+                        this.selectedSize = s.size;
+                        this.selectedSizeId = s.id;
+                    }
+                    this.start();
+                },
 
-    // select handlers now receive the whole object
-    selectColor(c) {
-      if (!this.isColorAvailable(c.hex)) return;
-      this.selectedColorHex = c.hex;
-      this.selectedColorId  = c.id;
-      this.index = 0;
-      this.clampQty();
-    },
-    selectSize(s) {
-      if (!this.isSizeAvailable(s.size)) return;
-      this.selectedSize   = s.size;
-      this.selectedSizeId = s.id;
-      this.clampQty();
-    },
+                // select handlers now receive the whole object
+                selectColor(c) {
+                    if (!this.isColorAvailable(c.hex)) return;
+                    this.selectedColorHex = c.hex;
+                    this.selectedColorId = c.id;
+                    this.index = 0;
+                    this.clampQty();
+                },
+                selectSize(s) {
+                    if (!this.isSizeAvailable(s.size)) return;
+                    this.selectedSize = s.size;
+                    this.selectedSizeId = s.id;
+                    this.clampQty();
+                },
 
-    hasColorOptions() { return this.colors.length > 0 },
-    hasSizeOptions()  { return this.sizes.length  > 0 },
+                hasColorOptions() {
+                    return this.colors.length > 0
+                },
+                hasSizeOptions() {
+                    return this.sizes.length > 0
+                },
 
-    // Find exact variant row qty; returns 0 if not found
-    qtyFor(colorHex, size) {
-      const row = this.stock.find(r =>
-        (r.colorHex || null) === (colorHex || null) &&
-        (r.size     || null) === (size     || null)
-      );
-      return row ? Math.max(0, parseInt(row.qty, 10) || 0) : 0;
-    },
+                // Find exact variant row qty; returns 0 if not found
+                qtyFor(colorHex, size) {
+                    const row = this.stock.find(r =>
+                        (r.colorHex || null) === (colorHex || null) &&
+                        (r.size || null) === (size || null)
+                    );
+                    return row ? Math.max(0, parseInt(row.qty, 10) || 0) : 0;
+                },
 
-    // Variant id for cart (unchanged)
-    currentVariantId() {
-      if (this.hasColorOptions() && this.hasSizeOptions()) {
-        if (!this.selectedColorHex || !this.selectedSize) return null;
-        const row = this.stock.find(r => r.colorHex === this.selectedColorHex && r.size === this.selectedSize);
-        return row ? row.id : null;
-      }
-      if (this.hasColorOptions() && !this.hasSizeOptions()) {
-        if (!this.selectedColorHex) return null;
-        const row = this.stock.find(r => r.colorHex === this.selectedColorHex && (r.size || null) === null);
-        return row ? row.id : null;
-      }
-      if (!this.hasColorOptions() && this.hasSizeOptions()) {
-        if (!this.selectedSize) return null;
-        const row = this.stock.find(r => r.size === this.selectedSize && (r.colorHex || null) === null);
-        return row ? row.id : null;
-      }
-      return null;
-    },
+                // Variant id for cart (unchanged)
+                currentVariantId() {
+                    if (this.hasColorOptions() && this.hasSizeOptions()) {
+                        if (!this.selectedColorHex || !this.selectedSize) return null;
+                        const row = this.stock.find(r => r.colorHex === this.selectedColorHex && r.size === this
+                            .selectedSize);
+                        return row ? row.id : null;
+                    }
+                    if (this.hasColorOptions() && !this.hasSizeOptions()) {
+                        if (!this.selectedColorHex) return null;
+                        const row = this.stock.find(r => r.colorHex === this.selectedColorHex && (r.size || null) === null);
+                        return row ? row.id : null;
+                    }
+                    if (!this.hasColorOptions() && this.hasSizeOptions()) {
+                        if (!this.selectedSize) return null;
+                        const row = this.stock.find(r => r.size === this.selectedSize && (r.colorHex || null) === null);
+                        return row ? row.id : null;
+                    }
+                    return null;
+                },
 
-    // NEW: expose color_id / size_id for hidden inputs
-    currentColorId() {
-      if (this.selectedColorId) return this.selectedColorId;
-      if (!this.selectedColorHex) return null;
-      const c = this.colors.find(x => x.hex === this.selectedColorHex);
-      return c ? c.id : null;
-    },
-    currentSizeId() {
-      if (this.selectedSizeId) return this.selectedSizeId;
-      if (!this.selectedSize) return null;
-      const s = this.sizes.find(x => x.size === this.selectedSize);
-      return s ? s.id : null;
-    },
+                // NEW: expose color_id / size_id for hidden inputs
+                currentColorId() {
+                    if (this.selectedColorId) return this.selectedColorId;
+                    if (!this.selectedColorHex) return null;
+                    const c = this.colors.find(x => x.hex === this.selectedColorHex);
+                    return c ? c.id : null;
+                },
+                currentSizeId() {
+                    if (this.selectedSizeId) return this.selectedSizeId;
+                    if (!this.selectedSize) return null;
+                    const s = this.sizes.find(x => x.size === this.selectedSize);
+                    return s ? s.id : null;
+                },
 
-    // availability / UI
-    maxQty() {
-      if (this.hasColorOptions() && this.hasSizeOptions()) {
-        if (!this.selectedColorHex || !this.selectedSize) return 0;
-        return this.qtyFor(this.selectedColorHex, this.selectedSize);
-      }
-      if (this.hasColorOptions() && !this.hasSizeOptions()) {
-        if (!this.selectedColorHex) return 0;
-        return this.qtyFor(this.selectedColorHex, null);
-      }
-      if (!this.hasColorOptions() && this.hasSizeOptions()) {
-        if (!this.selectedSize) return 0;
-        return this.qtyFor(null, this.selectedSize);
-      }
-      return Math.max(0, parseInt(this.productTotalQty, 10) || 0);
-    },
+                // availability / UI
+                maxQty() {
+                    if (this.hasColorOptions() && this.hasSizeOptions()) {
+                        if (!this.selectedColorHex || !this.selectedSize) return 0;
+                        return this.qtyFor(this.selectedColorHex, this.selectedSize);
+                    }
+                    if (this.hasColorOptions() && !this.hasSizeOptions()) {
+                        if (!this.selectedColorHex) return 0;
+                        return this.qtyFor(this.selectedColorHex, null);
+                    }
+                    if (!this.hasColorOptions() && this.hasSizeOptions()) {
+                        if (!this.selectedSize) return 0;
+                        return this.qtyFor(null, this.selectedSize);
+                    }
+                    return Math.max(0, parseInt(this.productTotalQty, 10) || 0);
+                },
 
-    clampQty() {
-      const m = this.maxQty();
-      if (m === 0) this.qty = 1;
-      else if (this.qty > m) this.qty = m;
-      else if (this.qty < 1) this.qty = 1;
-    },
+                clampQty() {
+                    const m = this.maxQty();
+                    if (m === 0) this.qty = 1;
+                    else if (this.qty > m) this.qty = m;
+                    else if (this.qty < 1) this.qty = 1;
+                },
 
-    isColorAvailable(hex) {
-      if (!this.hasSizeOptions()) return this.qtyFor(hex, null) > 0;
-      if (this.selectedSize)    return this.qtyFor(hex, this.selectedSize) > 0;
-      return this.sizes.some(s => this.qtyFor(hex, s.size) > 0);
-    },
-    isSizeAvailable(size) {
-      if (!this.hasColorOptions()) return this.qtyFor(null, size) > 0;
-      if (this.selectedColorHex) return this.qtyFor(this.selectedColorHex, size) > 0;
-      return this.colors.some(c => this.qtyFor(c.hex, size) > 0);
-    },
+                isColorAvailable(hex) {
+                    if (!this.hasSizeOptions()) return this.qtyFor(hex, null) > 0;
+                    if (this.selectedSize) return this.qtyFor(hex, this.selectedSize) > 0;
+                    return this.sizes.some(s => this.qtyFor(hex, s.size) > 0);
+                },
+                isSizeAvailable(size) {
+                    if (!this.hasColorOptions()) return this.qtyFor(null, size) > 0;
+                    if (this.selectedColorHex) return this.qtyFor(this.selectedColorHex, size) > 0;
+                    return this.colors.some(c => this.qtyFor(c.hex, size) > 0);
+                },
 
-    canAddToCart() {
-      const needColor = this.hasColorOptions() && !this.selectedColorHex;
-      const needSize  = this.hasSizeOptions()  && !this.selectedSize;
-      return !needColor && !needSize && this.maxQty() > 0;
-    },
+                canAddToCart() {
+                    const needColor = this.hasColorOptions() && !this.selectedColorHex;
+                    const needSize = this.hasSizeOptions() && !this.selectedSize;
+                    return !needColor && !needSize && this.maxQty() > 0;
+                },
 
-    availabilityLabel() {
-      const m = this.maxQty();
-      if (this.hasColorOptions() && !this.selectedColorHex) return '{{ __('Select color') }}';
-      if (this.hasSizeOptions()  && !this.selectedSize)     return '{{ __('Select size') }}';
-      return m > 0 ? `{{ __('Available') }}: ${m}` : '{{ __('Out of stock') }}';
-    },
+                availabilityLabel() {
+                    const m = this.maxQty();
+                    if (this.hasColorOptions() && !this.selectedColorHex) return '{{ __('Select color') }}';
+                    if (this.hasSizeOptions() && !this.selectedSize) return '{{ __('Select size') }}';
+                    return m > 0 ? `{{ __('Available') }}: ${m}` : '{{ __('Out of stock') }}';
+                },
 
-    // carousel (unchanged)
-    start(){ this.stop(); if (this.displayImages.length <= 1) return;
-      this.intervalId = setInterval(() => { if (!this.paused) this.next() }, 5000);
-    },
-    stop(){ if (this.intervalId) { clearInterval(this.intervalId); this.intervalId = null; } },
-    next(){ this.index = (this.index + 1) % this.displayImages.length; },
-    prev(){ this.index = (this.index - 1 + this.displayImages.length) % this.displayImages.length; },
-    go(i){ this.index = i; },
-    onMove(e){ const r = e.currentTarget.getBoundingClientRect();
-      this.originX = Math.max(0, Math.min(100, ((e.clientX - r.left) / r.width) * 100));
-      this.originY = Math.max(0, Math.min(100, ((e.clientY - r.top) / r.height) * 100));
-    },
-    imgStyle(i){ const active = this.index === i; const scale = this.hover && active ? this.zoom : 1;
-      return `transform-origin:${this.originX}% ${this.originY}%; transform:scale(${scale}); transition: transform 120ms ease;`;
-    },
-  }
-}
-   </script>
+                // carousel (unchanged)
+                start() {
+                    this.stop();
+                    if (this.displayImages.length <= 1) return;
+                    this.intervalId = setInterval(() => {
+                        if (!this.paused) this.next()
+                    }, 5000);
+                },
+                stop() {
+                    if (this.intervalId) {
+                        clearInterval(this.intervalId);
+                        this.intervalId = null;
+                    }
+                },
+                next() {
+                    this.index = (this.index + 1) % this.displayImages.length;
+                },
+                prev() {
+                    this.index = (this.index - 1 + this.displayImages.length) % this.displayImages.length;
+                },
+                go(i) {
+                    this.index = i;
+                },
+                onMove(e) {
+                    const r = e.currentTarget.getBoundingClientRect();
+                    this.originX = Math.max(0, Math.min(100, ((e.clientX - r.left) / r.width) * 100));
+                    this.originY = Math.max(0, Math.min(100, ((e.clientY - r.top) / r.height) * 100));
+                },
+                imgStyle(i) {
+                    const active = this.index === i;
+                    const scale = this.hover && active ? this.zoom : 1;
+                    return `transform-origin:${this.originX}% ${this.originY}%; transform:scale(${scale}); transition: transform 120ms ease;`;
+                },
+            }
+        }
+    </script>
 @endsection
