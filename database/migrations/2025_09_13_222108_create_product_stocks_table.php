@@ -43,8 +43,6 @@ return new class extends Migration {
         // Helpful indexes for admin/storefront queries
         Schema::table('product_stocks', function (Blueprint $table) {
             $table->index('product_id', 'product_stock_product_idx');
-            $table->index(['product_id', 'color_key'], 'product_stock_prod_color_idx');
-            $table->index(['product_id', 'size_key'], 'product_stock_prod_size_idx');
         });
     }
 
