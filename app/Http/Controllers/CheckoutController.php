@@ -6,6 +6,9 @@ use App\Mail\OrderConfirmationMail;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
+use App\Models\ProductColor;
+use App\Models\ProductSize;
+use App\Models\ProductStock;
 use App\Models\ShippingOption;
 use App\Services\InventoryService;
 use App\Services\StallionRates;
@@ -116,6 +119,7 @@ class CheckoutController extends Controller
         $request->validate([
             'email' => auth()->check() ? 'nullable|email' : 'required|email',
             'full_name' => 'required|string|max:255',
+            'phone' => 'required|string|max:25|regex:/^\+?[0-9\s\-]{7,20}$/',
             'country' => 'required|string',
             'city' => 'required|string',
             'shipping_address' => 'required|string',
@@ -328,6 +332,17 @@ class CheckoutController extends Controller
             $discountCents = min($discountCents, $itemsSubtotalCents);
         }
 
+
+        // --- Tax (13%) on items AFTER discount (exclude shipping)
+        $taxRate = 0.13;
+
+        // Items subtotal after discount in cents
+        $itemsAfterDiscountCents = max(0, $itemsSubtotalCents - $discountCents);
+
+        // Compute tax
+        $taxCents = (int) round($itemsAfterDiscountCents * $taxRate);
+
+
         // --- Distribute discount across items (pro-rata)
         $adjustedLineItems = [];
         $remainingDiscount = $discountCents;
@@ -392,6 +407,17 @@ class CheckoutController extends Controller
                 $shippingCents = 0;
             }
         }
+        if ($taxCents > 0) {
+            $adjustedLineItems[] = [
+                'price_data' => [
+                    'currency' => 'cad',
+                    'product_data' => ['name' => 'Tax (13%)'],
+                    'unit_amount' => $taxCents,
+                ],
+                'quantity' => 1,
+            ];
+        }
+
 
         if ($shippingCents > 0) {
             $adjustedLineItems[] = [
@@ -408,6 +434,7 @@ class CheckoutController extends Controller
         $billingMeta = [
             'bill_name' => $request->full_name,
             'bill_email' => $request->email,
+            'bill_phone' => $request->phone,
             'bill_line1' => $request->billing_address,
             'bill_city' => $request->city,
             'bill_country' => $request->country,
@@ -415,6 +442,7 @@ class CheckoutController extends Controller
         $shippingMeta = [
             'ship_name' => $request->full_name,
             'ship_email' => $request->email,
+            'ship_phone' => $request->phone,
             'ship_line1' => $request->shipping_address,
             'ship_city' => $request->city,
             'ship_country' => $request->country,
@@ -438,6 +466,8 @@ class CheckoutController extends Controller
         }
 
         $allMeta = array_filter(array_merge($baseMeta, $billingMeta, $shippingMeta, $promosMeta), fn($v) => $v !== null);
+        $allMeta['tax_rate_percent'] = '13';
+        $allMeta['tax_amount_cents'] = (string) $taxCents;
 
         $params = [
             'mode' => 'payment',
@@ -482,6 +512,7 @@ class CheckoutController extends Controller
             'limit' => 100,
             'expand' => ['data.price.product'],
         ]);
+
         // stripe-php ^14 would be:
         // $lineItems = $stripe->checkout->sessions->listLineItems($sessionId, ['limit' => 100, 'expand' => ['data.price.product']]);
 
@@ -495,6 +526,79 @@ class CheckoutController extends Controller
                 ? $piMetaArr[$key]
                 : (array_key_exists($key, $seMetaArr) ? $seMetaArr[$key] : $default);
         };
+
+                // --- Commit reservations if they still exist; else fallback decrement from paid line items
+$committed = false;
+
+try {
+    $reservationIdsCsv = (string) ($meta('reservation_ids') ?? '');
+    $reservationIds = array_filter(array_map('intval', explode(',', $reservationIdsCsv)));
+
+    if (!empty($reservationIds)) {
+        // Check if there are still active, non-expired holds for these IDs
+        $activeCount = \App\Models\StockReservation::query()
+            ->whereIn('id', $reservationIds)
+            ->where('status', true)
+            ->where('expires_at', '>', now())
+            ->count();
+
+        if ($activeCount > 0) {
+            // Normal path: commit (this decrements product_stocks / products)
+            InventoryService::commitReservations($reservationIds);
+            $committed = true;
+            \Log::info('Reservations committed', ['count' => $activeCount, 'ids' => $reservationIds]);
+        }
+    }
+} catch (\Throwable $e) {
+    \Log::warning('commitReservations failed, will try fallback decrement: ' . $e->getMessage());
+    $committed = false;
+}
+
+if (!$committed) {
+    // Graceful fallback: decrement from the *paid* Stripe line items (idempotent-ish)
+    \DB::transaction(function () use ($lineItems) {
+        foreach ($lineItems->data as $li) {
+            $qty = (int) ($li->quantity ?? 1);
+            if ($qty <= 0) continue;
+
+            // Read IDs from product metadata on the Stripe line item
+            $pm = (isset($li->price->product->metadata) && $li->price->product->metadata)
+                ? $li->price->product->metadata->toArray()
+                : [];
+
+            $productStockId = (int) ($pm['product_stock_id'] ?? 0);
+            $productId      = (int) ($pm['product_id'] ?? 0);
+
+            if ($productStockId) {
+                // Variant-based decrement
+                $ps = ProductStock::query()->whereKey($productStockId)->lockForUpdate()->first();
+                if ($ps) {
+                    // Prevent negative; if you prefer hard-fail on insufficient, add a guard/throw here
+                    $ps->quantity_on_hand = max(0, ((int) $ps->quantity_on_hand) - $qty);
+                    $ps->save();
+                } else {
+                    Log::warning('Fallback decrement: product_stock not found', ['product_stock_id' => $productStockId, 'qty' => $qty]);
+                }
+            } elseif ($productId) {
+                // Product-level decrement (no variants)
+                $p = Product::query()->whereKey($productId)->lockForUpdate()->first();
+                if ($p && isset($p->stock_quantity)) {
+                    $p->stock_quantity = max(0, ((int) $p->stock_quantity) - $qty);
+                    $p->save();
+                } else {
+                    Log::warning('Fallback decrement: product not found or no stock_quantity field', ['product_id' => $productId, 'qty' => $qty]);
+                }
+            } else {
+                Log::warning('Fallback decrement skipped: no product_stock_id/product_id in Stripe metadata for line item', [
+                    'description' => (string) ($li->description ?? ''),
+                ]);
+            }
+        }
+    });
+
+    \Log::info('Fallback decrement completed (no active reservations to commit)');
+}
+
 
         // ---- Commit reservations & release leftovers for this browsing session
         try {
@@ -538,7 +642,7 @@ class CheckoutController extends Controller
             'state' => $meta('ship_state', optional($addr)->state),
             'postal_code' => $meta('ship_postal', optional($addr)->postal_code),
             'country' => $meta('ship_country', optional($addr)->country),
-            'phone' => optional($cust)->phone,
+            'phone' => $meta('ship_phone', optional($addr)->phone),
         ];
 
         $currency = strtoupper($session->currency);
@@ -546,7 +650,25 @@ class CheckoutController extends Controller
         $subCents = (int) $session->amount_subtotal;
         $discCents = (int) (optional($session->total_details)->amount_discount ?? 0);
         $shipCents = (int) (optional($session->total_details)->amount_shipping ?? 0);
+        // Prefer Automatic Tax (if ever enabled)
         $taxCents = (int) (optional($session->total_details)->amount_tax ?? 0);
+
+        // Fallback to our own metadata (manual tax line)
+        if ($taxCents === 0) {
+            $taxCents = (int) ($meta('tax_amount_cents') ?? 0);
+        }
+
+        // Final fallback: sum any line items named "Tax ..."
+        if ($taxCents === 0) {
+            $taxCents = collect($lineItems->data)
+                ->filter(function ($li) {
+                    $desc = (string) ($li->description ?? '');
+                    return stripos($desc, 'tax') === 0; // starts with "Tax"
+                })
+                ->sum(function ($li) {
+                    return (int) ($li->amount_total ?? 0);
+                });
+        }
 
         $paymentIntentId = is_string($session->payment_intent)
             ? $session->payment_intent
@@ -558,7 +680,7 @@ class CheckoutController extends Controller
             $uidMeta = $meta('user_id');
             if (is_string($uidMeta) && ctype_digit($uidMeta)) {
                 $candidate = (int) $uidMeta;
-                if (\App\Models\User::whereKey($candidate)->exists()) {
+                if (User::whereKey($candidate)->exists()) {
                     $userId = $candidate;
                 }
             }
@@ -614,7 +736,7 @@ class CheckoutController extends Controller
             ];
         }
 
-        $order = \App\Models\Order::firstOrCreate(
+        $order = Order::firstOrCreate(
             ['stripe_session_id' => $sessionId],
             [
                 'user_id' => $userId,
@@ -673,10 +795,10 @@ class CheckoutController extends Controller
                 $colorId = (int) ($pm['color_id'] ?? 0) ?: null;
                 $sizeId = (int) ($pm['size_id'] ?? 0) ?: null;
 
-                $colorModel = $colorId ? \App\Models\ProductColor::find($colorId) : null;
-                $sizeModel = $sizeId ? \App\Models\ProductSize::find($sizeId) : null;
+                $colorModel = $colorId ? ProductColor::find($colorId) : null;
+                $sizeModel = $sizeId ? ProductSize::find($sizeId) : null;
 
-                \App\Models\OrderItem::create([
+                OrderItem::create([
                     'order_id' => $order->id,
                     'product_id' => $productId, // if you want to persist it
                     'name' => $li->description,
@@ -716,10 +838,10 @@ class CheckoutController extends Controller
 
 
             // (Optional) promo bookkeeping
-            if (!empty($promosApplied) && class_exists(\App\Models\PromoCode::class)) {
+            if (!empty($promosApplied) && class_exists(PromoCode::class)) {
                 foreach ($promosApplied as $applied) {
                     try {
-                        if ($pc = \App\Models\PromoCode::where('code', $applied['code'])->first()) {
+                        if ($pc = PromoCode::where('code', $applied['code'])->first()) {
                             $pc->increment('used_count');
                         }
                     } catch (\Throwable $e) {
