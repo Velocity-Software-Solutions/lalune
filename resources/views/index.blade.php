@@ -5,6 +5,26 @@
 @endpush
 
 @section('content')
+<div class="h-[40vh] md:h-[60vh] mx-6 rounded-3xl 
+             bg-cover bg-center bg-no-repeat md:bg-fixed"
+     style="background-image:url('{{ asset('images/index-hero.jpg') }}');">
+    <!-- Optional overlay -->
+    <div class="w-full h-full bg-black/30 flex flex-col items-center justify-center rounded-3xl backdrop:blur-sm px-4 text-center">
+        <h1 class="text-2xl md:text-4xl montserrat-bolder text-white/90">Made in Canada</h1>
+        <br>
+        <h3 class="text-xl md:text-2xl montserrat-bolder text-white/90">With love &amp; care</h3>
+        <br>
+
+        <!-- Promo Codes Section -->
+        <div class="space-y-2 text-white/90 text-sm md:text-lg montserrat-bolder">
+            <p>Free Shipping on CAD 250+ with code <span class="text-white font-bold">FREESHIP</span></p>
+            <p>Save 10% on CAD 300+ with code <span class="text-white font-bold">THANKS10</span></p>
+            <p>Save 15% on CAD 400+ with code <span class="text-white font-bold">THANKS15</span></p>
+            <p>Save 20% on CAD 500+ with code <span class="text-white font-bold">THANKS20</span></p>
+        </div>
+    </div>
+</div>
+
     @php
         // Flatten your grouped products to a simple array
         $productsFlat = collect($products)
