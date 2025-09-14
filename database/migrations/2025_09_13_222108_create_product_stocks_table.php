@@ -26,7 +26,7 @@ return new class extends Migration {
         // CHECK: at least one dimension must be present
         try {
             DB::statement("
-                ALTER TABLE product_stock
+                ALTER TABLE product_stocks
                 ADD CONSTRAINT chk_product_stock_atleast_one_dim
                 CHECK ((color_id IS NOT NULL) OR (size_id IS NOT NULL))
             ");
@@ -36,12 +36,12 @@ return new class extends Migration {
 
         // Unique combination per product
         DB::statement("
-            ALTER TABLE product_stock
+            ALTER TABLE product_stocks
             ADD CONSTRAINT uq_product_stock_combo UNIQUE (product_id, color_key, size_key)
         ");
 
         // Helpful indexes for admin/storefront queries
-        Schema::table('product_stock', function (Blueprint $table) {
+        Schema::table('product_stocks', function (Blueprint $table) {
             $table->index('product_id', 'product_stock_product_idx');
             $table->index(['product_id', 'color_key'], 'product_stock_prod_color_idx');
             $table->index(['product_id', 'size_key'], 'product_stock_prod_size_idx');
@@ -50,6 +50,6 @@ return new class extends Migration {
 
     public function down(): void
     {
-        Schema::dropIfExists('product_stock'); // drops constraints/indexes with it
+        Schema::dropIfExists('product_stocks'); // drops constraints/indexes with it
     }
 };
