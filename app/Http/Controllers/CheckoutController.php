@@ -9,9 +9,9 @@ use App\Models\Product;
 use App\Models\ProductColor;
 use App\Models\ProductSize;
 use App\Models\ProductStock;
+use App\Models\PromoCode;
 use App\Models\ShippingOption;
 use App\Services\InventoryService;
-use App\Services\StallionRates;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
@@ -121,7 +121,8 @@ class CheckoutController extends Controller
             'full_name' => 'required|string|max:255',
             'phone' => 'required|string|max:25|regex:/^\+?[0-9\s\-]{7,20}$/',
             'country' => 'required|string',
-            'city' => 'required|string',
+            'city' => 'required|string|max:255',
+            'state' => 'required|string|max:255',
             'shipping_address' => 'required|string',
             'billing_address' => 'nullable|string',
         ]);
@@ -437,6 +438,7 @@ class CheckoutController extends Controller
             'bill_phone' => $request->phone,
             'bill_line1' => $request->billing_address,
             'bill_city' => $request->city,
+            'bill_state' => $request->state,
             'bill_country' => $request->country,
         ];
         $shippingMeta = [
@@ -445,6 +447,7 @@ class CheckoutController extends Controller
             'ship_phone' => $request->phone,
             'ship_line1' => $request->shipping_address,
             'ship_city' => $request->city,
+            'ship_state' => $request->state,
             'ship_country' => $request->country,
         ];
         $baseMeta = [];
@@ -527,77 +530,78 @@ class CheckoutController extends Controller
                 : (array_key_exists($key, $seMetaArr) ? $seMetaArr[$key] : $default);
         };
 
-                // --- Commit reservations if they still exist; else fallback decrement from paid line items
-$committed = false;
+        // --- Commit reservations if they still exist; else fallback decrement from paid line items
+        $committed = false;
 
-try {
-    $reservationIdsCsv = (string) ($meta('reservation_ids') ?? '');
-    $reservationIds = array_filter(array_map('intval', explode(',', $reservationIdsCsv)));
+        try {
+            $reservationIdsCsv = (string) ($meta('reservation_ids') ?? '');
+            $reservationIds = array_filter(array_map('intval', explode(',', $reservationIdsCsv)));
 
-    if (!empty($reservationIds)) {
-        // Check if there are still active, non-expired holds for these IDs
-        $activeCount = \App\Models\StockReservation::query()
-            ->whereIn('id', $reservationIds)
-            ->where('status', true)
-            ->where('expires_at', '>', now())
-            ->count();
+            if (!empty($reservationIds)) {
+                // Check if there are still active, non-expired holds for these IDs
+                $activeCount = \App\Models\StockReservation::query()
+                    ->whereIn('id', $reservationIds)
+                    ->where('status', true)
+                    ->where('expires_at', '>', now())
+                    ->count();
 
-        if ($activeCount > 0) {
-            // Normal path: commit (this decrements product_stocks / products)
-            InventoryService::commitReservations($reservationIds);
-            $committed = true;
-            \Log::info('Reservations committed', ['count' => $activeCount, 'ids' => $reservationIds]);
-        }
-    }
-} catch (\Throwable $e) {
-    \Log::warning('commitReservations failed, will try fallback decrement: ' . $e->getMessage());
-    $committed = false;
-}
-
-if (!$committed) {
-    // Graceful fallback: decrement from the *paid* Stripe line items (idempotent-ish)
-    \DB::transaction(function () use ($lineItems) {
-        foreach ($lineItems->data as $li) {
-            $qty = (int) ($li->quantity ?? 1);
-            if ($qty <= 0) continue;
-
-            // Read IDs from product metadata on the Stripe line item
-            $pm = (isset($li->price->product->metadata) && $li->price->product->metadata)
-                ? $li->price->product->metadata->toArray()
-                : [];
-
-            $productStockId = (int) ($pm['product_stock_id'] ?? 0);
-            $productId      = (int) ($pm['product_id'] ?? 0);
-
-            if ($productStockId) {
-                // Variant-based decrement
-                $ps = ProductStock::query()->whereKey($productStockId)->lockForUpdate()->first();
-                if ($ps) {
-                    // Prevent negative; if you prefer hard-fail on insufficient, add a guard/throw here
-                    $ps->quantity_on_hand = max(0, ((int) $ps->quantity_on_hand) - $qty);
-                    $ps->save();
-                } else {
-                    Log::warning('Fallback decrement: product_stock not found', ['product_stock_id' => $productStockId, 'qty' => $qty]);
+                if ($activeCount > 0) {
+                    // Normal path: commit (this decrements product_stocks / products)
+                    InventoryService::commitReservations($reservationIds);
+                    $committed = true;
+                    \Log::info('Reservations committed', ['count' => $activeCount, 'ids' => $reservationIds]);
                 }
-            } elseif ($productId) {
-                // Product-level decrement (no variants)
-                $p = Product::query()->whereKey($productId)->lockForUpdate()->first();
-                if ($p && isset($p->stock_quantity)) {
-                    $p->stock_quantity = max(0, ((int) $p->stock_quantity) - $qty);
-                    $p->save();
-                } else {
-                    Log::warning('Fallback decrement: product not found or no stock_quantity field', ['product_id' => $productId, 'qty' => $qty]);
-                }
-            } else {
-                Log::warning('Fallback decrement skipped: no product_stock_id/product_id in Stripe metadata for line item', [
-                    'description' => (string) ($li->description ?? ''),
-                ]);
             }
+        } catch (\Throwable $e) {
+            \Log::warning('commitReservations failed, will try fallback decrement: ' . $e->getMessage());
+            $committed = false;
         }
-    });
 
-    \Log::info('Fallback decrement completed (no active reservations to commit)');
-}
+        if (!$committed) {
+            // Graceful fallback: decrement from the *paid* Stripe line items (idempotent-ish)
+            \DB::transaction(function () use ($lineItems) {
+                foreach ($lineItems->data as $li) {
+                    $qty = (int) ($li->quantity ?? 1);
+                    if ($qty <= 0)
+                        continue;
+
+                    // Read IDs from product metadata on the Stripe line item
+                    $pm = (isset($li->price->product->metadata) && $li->price->product->metadata)
+                        ? $li->price->product->metadata->toArray()
+                        : [];
+
+                    $productStockId = (int) ($pm['product_stock_id'] ?? 0);
+                    $productId = (int) ($pm['product_id'] ?? 0);
+
+                    if ($productStockId) {
+                        // Variant-based decrement
+                        $ps = ProductStock::query()->whereKey($productStockId)->lockForUpdate()->first();
+                        if ($ps) {
+                            // Prevent negative; if you prefer hard-fail on insufficient, add a guard/throw here
+                            $ps->quantity_on_hand = max(0, ((int) $ps->quantity_on_hand) - $qty);
+                            $ps->save();
+                        } else {
+                            Log::warning('Fallback decrement: product_stock not found', ['product_stock_id' => $productStockId, 'qty' => $qty]);
+                        }
+                    } elseif ($productId) {
+                        // Product-level decrement (no variants)
+                        $p = Product::query()->whereKey($productId)->lockForUpdate()->first();
+                        if ($p && isset($p->stock_quantity)) {
+                            $p->stock_quantity = max(0, ((int) $p->stock_quantity) - $qty);
+                            $p->save();
+                        } else {
+                            Log::warning('Fallback decrement: product not found or no stock_quantity field', ['product_id' => $productId, 'qty' => $qty]);
+                        }
+                    } else {
+                        Log::warning('Fallback decrement skipped: no product_stock_id/product_id in Stripe metadata for line item', [
+                            'description' => (string) ($li->description ?? ''),
+                        ]);
+                    }
+                }
+            });
+
+            \Log::info('Fallback decrement completed (no active reservations to commit)');
+        }
 
 
         // ---- Commit reservations & release leftovers for this browsing session
@@ -857,7 +861,7 @@ if (!$committed) {
         // Only email once
         if (!$order->getAttribute('receipt_emailed_at')) {
             try {
-                Mail::mailer('noreply')->to($order->email)->send(new \App\Mail\OrderConfirmationMail($order));
+                Mail::mailer('noreply')->to($order->email)->send(new OrderConfirmationMail($order));
                 $order->forceFill(['receipt_emailed_at' => now()])->save();
             } catch (\Throwable $e) {
                 Log::warning('Order receipt email failed: ' . $e->getMessage());

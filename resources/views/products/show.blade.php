@@ -52,11 +52,11 @@
         ->values(),
     'stock' => $stockPayload,
     'productTotalQty' => $productTotalQty ?? 0,
-]))" <div class="grid grid-cols-1 gap-8 md:grid-cols-2 place-items-center">
+]))" <div class="grid grid-cols-1 gap-16 lg:gap-8 md:grid-cols-2 place-items-center">
             {{-- Left Panel --}}
             <div class="w-full h-full">
                 {{-- Carousel --}}
-                <div class="relative w-full h-full rounded-lg overflow-hidden">
+                <div class="relative w-full h-full rounded-lg overflow-hidden min-h-96">
                     <div>
                         <!-- Slides -->
                         <template x-for="(img, i) in displayImages" :key="i">
@@ -99,7 +99,7 @@
             </div>
 
             {{-- Right panel --}}
-            <div class="w-full">
+            <div class="w-full px-5">
                 <h1 class="mb-2 text-3xl montaga-semibold text-charcoal">
                     {{ $product->name }}
                 </h1>
