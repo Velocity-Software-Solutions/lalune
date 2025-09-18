@@ -10,7 +10,7 @@ class StoreController extends Controller
     {
         $locale = app()->getLocale();
 
-        $products = Product::with(['images', 'category','sizes'])
+        $products = Product::with(['images', 'category','sizes','approvedReviews:id,product_id,rating'])
                     ->whereHas('category', function ($q) {
                 $q->where('status', 1);
             })

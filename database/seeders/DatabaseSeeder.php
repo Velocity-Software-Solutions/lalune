@@ -17,12 +17,14 @@ class DatabaseSeeder extends Seeder
         // User::factory(10)->create();
 
         
-        User::factory()->create([
-            'name' => 'Nony',
-            'email' => 'nony@lalunebyne.com',
-            'password' => Hash::make('nony@1987'),
-            'type' => 1,
-        ]);
-
+        // User::factory()->create([
+        //     'name' => 'Nony',
+        //     'email' => 'nony@lalunebyne.com',
+        //     'password' => Hash::make('nony@1987'),
+        //     'type' => 1,
+        // ]);
+    $this->call([
+        ProductReviewSeeder::class,
+    ]);
     }
 }

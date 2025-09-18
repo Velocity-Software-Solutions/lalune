@@ -104,7 +104,15 @@
                     <span class="flex-1 ml-3 text-left whitespace-nowrap">Promo Codes</span>
                 </li>
             </a>
-      
+                  <a href="{{ route('admin.reviews.index') }}" class="w-full">
+                <li
+                    class="flex items-center w-full gap-2 p-2 rounded-xl hover:bg-gray-300 dark:hover:bg-gray-500 group">
+                    <span
+                        class="text-2xl text-gray-400 transition duration-75 material-icons dark:text-gray-600 group-hover:text-gray-900 dark:group-hover:text-white">
+                        reviews </span>
+                    <span class="flex-1 ml-3 text-left whitespace-nowrap">Ratings</span>
+                </li>
+            </a>
             {{-- <a href="{{ route('admin.shipping-options.index') }}" class="w-full">
                 <li
                     class="flex items-center w-full gap-2 p-2 rounded-xl hover:bg-gray-300 dark:hover:bg-gray-500 group">

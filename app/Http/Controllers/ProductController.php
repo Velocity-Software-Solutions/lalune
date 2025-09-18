@@ -33,7 +33,7 @@ public function index(Request $request)
 
 public function show($id)
 {
-    $product = Product::with(['images', 'colors', 'sizes', 'stock'])->findOrFail($id);
+    $product = Product::with(['images', 'colors', 'sizes', 'stock','approvedReviews'])->findOrFail($id);
 
     // Similar products
     $smiliarProducts = Product::where('category_id', $product->category_id)

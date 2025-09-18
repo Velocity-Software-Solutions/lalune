@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\CategoryController;
+use App\Http\Controllers\Admin\ProductReviewController;
 use App\Http\Controllers\Admin\PromoCodeController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\ProductController;
@@ -26,6 +27,10 @@ Route::middleware(['auth', IsAdmin::class])->group(function () {
     Route::resource('products', ProductController::class);
     Route::resource('promo-codes', PromoCodeController::class);
     // Route::resource('shipping-options', ShippingOptionController::class);
+    Route::get('/reviews', [ProductReviewController::class, 'index'])->name('reviews.index');
+    Route::patch('/reviews/{review}/approve', [ProductReviewController::class, 'approve'])->name('reviews.approve');
+    Route::patch('/reviews/{review}/reject', [ProductReviewController::class, 'reject'])->name('reviews.reject');
+    Route::delete('/reviews/{review}', [ProductReviewController::class, 'destroy'])->name('reviews.destroy');
     Route::resource('orders', OrderController::class);
     Route::post('/product/image/delete', [ProductController::class, 'deleteImage'])->name('product.image.delete');
 

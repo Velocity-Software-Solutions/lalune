@@ -58,10 +58,30 @@ class Product extends Model
         return $this->hasMany(ProductStock::class, 'product_id');
     }
 
-        public function reservations()
+    public function reservations()
     {
         return $this->hasMany(StockReservation::class)
-                    ->whereNull('product_stock_id');
+            ->whereNull('product_stock_id');
+    }
+
+    public function reviews()
+    {
+        return $this->hasMany(ProductReview::class);
+    }
+
+    public function approvedReviews()
+    {
+        return $this->reviews()->where('status', 'approved')->latest();
+    }
+
+    public function getAverageRatingAttribute(): float
+    {
+        return round((float) $this->approvedReviews()->avg('rating') ?? 0, 1);
+    }
+
+    public function getReviewsCountAttribute(): int
+    {
+        return (int) $this->approvedReviews()->count();
     }
 
 }

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\CollectionController;
 use App\Http\Controllers\ContactController;
+use App\Http\Controllers\ProductReviewController;
 use App\Http\Middleware\SetLocale;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\CheckoutController;
@@ -25,25 +26,25 @@ Route::get('/collections', [CollectionController::class, 'index'])->name('collec
 
 //About Us
 Route::get('/about-us', function () {
-return view('about');
+    return view('about');
 })->name('about-us');
 
 //Contact Form Submisssion
-Route::post('contact', [ContactController::class,'submit'])->name('contact.submit');
+Route::post('contact', [ContactController::class, 'submit'])->name('contact.submit');
 
 //Return Policy
 Route::get('/return-policy', function () {
-return view('return-policy');
+    return view('return-policy');
 })->name('return-policy');
 
 //Terms & Conditions
 Route::get('/terms-conditions', function () {
-return view('terms-conditions');
+    return view('terms-conditions');
 })->name('terms-conditions');
 
 //Privacy Policy
 Route::get('/privacy-policy', function () {
-return view('privacy-policy');
+    return view('privacy-policy');
 })->name('privacy-policy');
 
 /*
@@ -63,6 +64,11 @@ Route::delete('/cart/remove/{id}', [CartController::class, 'remove'])->name('car
 // Coupon actions (two possible endpoints for flexibility)
 Route::post('/cart/apply-promo', [CartController::class, 'applyPromo'])->name('cart.applyPromo');
 Route::delete('/cart/remove-promo/{code}', [CartController::class, 'removePromo'])->name('cart.removePromo');
+
+//Ratings and reviews
+Route::post('/products/{product}/reviews', [ProductReviewController::class, 'store'])
+    ->name('products.reviews.store');
+
 
 /*
 |--------------------------------------------------------------------------

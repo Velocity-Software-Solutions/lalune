@@ -35,6 +35,9 @@
         $productsFlat = collect($products)
             ->flatMap(function ($group, $label) {
                 return collect($group)->map(function ($p) use ($label) {
+                    // Use the loaded relation if available (avoid N+1)
+                    $approved = $p->relationLoaded('approvedReviews') ? $p->approvedReviews : collect();
+
                     return [
                         'id' => $p->id,
                         'name' => $p->name,
@@ -45,9 +48,12 @@
                         'category_label' => $label,
                         'category_id' => $p->category_id,
 
-                        // NEW: product sizes as array of strings
-                        // If your field is not "name", change to ->pluck('value') etc.
+                        // sizes for filter
                         'sizes' => $p->sizes?->pluck('size')->filter()->values()->all() ?? [],
+
+                        // ⭐️ NEW: rating summary
+                        'avg_rating' => $approved->count() ? round($approved->avg('rating') * 2) / 2 : 0,
+                        'reviews_count' => $approved->count(),
                     ];
                 });
             })
@@ -230,6 +236,31 @@
                                         <h3 class="text-base sm:text-lg montserrat-bold text-charcoal tracking-wide"
                                             x-text="item.name"></h3>
 
+                                        {{-- Numeric rating chip --}}
+                                        <div class="mt-1">
+                                            <template x-if="item.reviews_count > 0">
+                                                <span
+                                                    class="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-2.5 py-1 text-xs sm:text-sm text-gray-800"
+                                                    :aria-label="`${item.avg_rating.toFixed(1)} out of 5 based on ${item.reviews_count} reviews`">
+                                                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"
+                                                        aria-hidden="true">
+                                                        <path
+                                                            d="M12 17.3l-6.16 3.3 1.18-6.88-5-4.86 6.91-1 3.09-6.26 3.09 6.26 6.91 1-5 4.86 1.18 6.88z" />
+                                                    </svg>
+                                                    <span x-text="item.avg_rating.toFixed(1)"></span>
+                                                    <span class="text-gray-500"
+                                                        x-text="`/ 5 · ${item.reviews_count}`"></span>
+                                                </span>
+                                            </template>
+
+                                            <template x-if="item.reviews_count === 0">
+                                                <span
+                                                    class="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-2.5 py-1 text-xs sm:text-sm text-gray-500">
+                                                    New · No reviews yet
+                                                </span>
+                                            </template>
+                                        </div>
+
                                         <p class="mt-1 text-sm sm:text-[15px] text-charcoal/90 font-mono line-clamp-3"
                                             x-html="item.description">
                                         </p>
@@ -251,6 +282,7 @@
                                                     x-text="`CAD ${formatPrice(item.price)}`"></span>
                                             </template>
                                         </div>
+
                                     </div>
                                 </div>
 
@@ -414,6 +446,18 @@
                     if (categoryId) u.searchParams.set('category', String(categoryId));
                     return u.toString();
                 },
+                moonSeg(r, max = 5) {
+                    r = Math.max(0, Math.min(max, Number(r) || 0));
+                    const full = Math.floor(r);
+                    const half = (r - full) >= 0.5 ? 1 : 0;
+                    const empty = max - full - half;
+                    return {
+                        full,
+                        half,
+                        empty
+                    };
+                },
+
             }
         }
     </script>
