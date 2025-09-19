@@ -213,7 +213,7 @@
             $recent = $approved->sortByDesc(fn($r) => $r->created_at ?? now())->take(5);
         @endphp
 
-        <div x-data="{ showReviewForm: false }" class="mt-16 m-4">
+        <div x-data="{ showReviewForm: false }" class="mt-16 m-4" id="reviews">
             <div class="flex items-center justify-between mb-3">
                 <h2 class="text-lg font-semibold text-black">Customer Reviews</h2>
 
@@ -425,7 +425,7 @@
                                 <span class="text-xl font-bold text-gray-600">
                                     {{ __('product.currency_aed') }} {{ number_format($sp->price, 2) }}
                                 </span>
-                                <a href="{{ route('products.show', $sp->id) }}"
+                                <a href="{{ route('products.show', $sp->slug) }}"
                                     class="inline-block px-3 py-1 text-white transition bg-gray-600 rounded hover:bg-gray-700">
                                     {{ __('product.view') }}
                                 </a>

@@ -19,7 +19,7 @@ Route::get('/', [StoreController::class, 'home'])->name('home');
 
 // Product listing & details
 Route::get('/products', [ProductController::class, 'index'])->name('products.index');
-Route::get('/products/{id}', [ProductController::class, 'show'])->name('products.show'); // Show single product
+Route::get('/products/{slug}', [ProductController::class, 'show'])->name('products.show'); // Show single product
 
 // Collections 
 Route::get('/collections', [CollectionController::class, 'index'])->name('collections');

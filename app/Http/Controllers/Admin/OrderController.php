@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\SendReviewEmail;
 use App\Mail\OrderCancelledMail;
 use App\Mail\OrderShippedMail;
 use App\Models\Order;
@@ -427,6 +428,10 @@ class OrderController extends Controller
                 try {
                     if ($newStatus === 'shipped') {
                         Mail::mailer('noreply')->to($order->email)->send(new OrderShippedMail($order));
+                    } elseif ($newStatus === 'delivered') {
+                        SendReviewEmail::dispatch($order->id)
+                            ->delay(now()->addDay());
+
                     } elseif ($newStatus === 'cancelled') {
                         Mail::mailer('noreply')->to($order->email)->send(new OrderCancelledMail($order));
                     }

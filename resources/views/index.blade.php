@@ -40,6 +40,7 @@
 
                     return [
                         'id' => $p->id,
+                        'slug' => $p->slug,
                         'name' => $p->name,
                         'description' => $p->description,
                         'price' => (float) $p->price,
@@ -286,7 +287,7 @@
                                     </div>
                                 </div>
 
-                                <a :href="productUrl(item.id)"
+                                <a :href="productUrl(item.slug)"
                                     class="mt-2 inline-block text-center px-3 py-2 text-white rounded
                         transition-all duration-500 ease-in-out
                         bg-gradient-to-r from-black via-neutral-600 to-black
