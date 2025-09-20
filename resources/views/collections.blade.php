@@ -25,22 +25,44 @@
                             class="product-box flex flex-col justify-between px-2 py-5 !transition rounded-2xl !duration-500 hover:shadow-2xl hover:-translate-y-4 hover:border-black/5 fade-up will-change:transform">
                             <div>
                                 @if ($product->images->count())
-                                    <div x-data="{ current: 0 }"
-                                        class="relative flex justify-center items-center w-full h-[300px] overflow-hidden rounded-t-md p-2">
-                                        <template x-for="(img, index) in {{ $product->images->take(3)->toJson() }}"
-                                            :key="index">
+                                    <div x-data="{ current: 0, photos: {{ $product->images->take(6)->toJson() }} }"
+                                        class="relative flex justify-center items-center w-full h-[300px] overflow-hidden rounded-t-md p-2 bg-white">
+
+                                        <!-- Main image -->
+                                        <template x-for="(img, index) in photos" :key="index">
                                             <img x-show="current === index" x-transition :src="'/storage/' + img.image_path"
                                                 @click="showModal = true; modalImage = '/storage/' + img.image_path"
                                                 class="h-full object-contain cursor-zoom-in rounded-md"
                                                 alt="{{ $product->name }}">
                                         </template>
 
-                                        <div class="absolute bottom-3 left-1/2 transform -translate-x-1/2 flex gap-2">
-                                            <template x-for="(img, index) in {{ $product->images->take(3)->toJson() }}"
-                                                :key="index">
-                                                <button @click="current = index"
-                                                    :class="{ 'bg-black': current === index, 'bg-gray-300': current !== index }"
-                                                    class="btn-view w-3 h-3 rounded-full"></button>
+                                        <!-- Prev Arrow -->
+                                        <button @click="current = (current - 1 + photos.length) % photos.length"
+                                            x-show="photos.length > 1"
+                                            class="absolute left-2 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/70 text-white rounded-full w-8 h-8 flex justify-center items-center"
+                                            aria-label="Previous image">
+                                            &#10094;
+                                        </button>
+
+                                        <!-- Next Arrow -->
+                                        <button @click="current = (current + 1) % photos.length" x-show="photos.length > 1"
+                                            class="absolute right-2 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/70 text-white rounded-full w-8 h-8 flex justify-center items-center"
+                                            aria-label="Next image">
+                                            &#10095;
+                                        </button>
+
+                                        <!-- Thumbnail squares (bottom center) -->
+                                        <div class="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2">
+                                            <template x-for="(thumb, tIndex) in photos" :key="'thumb-' + tIndex">
+                                                <button type="button" @click="current = tIndex"
+                                                    class="w-8 h-8 sm:w-9 sm:h-9 rounded-[6px] overflow-hidden border-2 transition shadow-sm"
+                                                    :class="current === tIndex ?
+                                                        'border-white ring-2 ring-black/20' :
+                                                        'border-white/80 opacity-80 hover:opacity-100'"
+                                                    :aria-label="`Show image ${tIndex + 1}`">
+                                                    <img :src="'/storage/' + thumb.image_path" alt=""
+                                                        class="w-full h-full object-cover">
+                                                </button>
                                             </template>
                                         </div>
                                     </div>

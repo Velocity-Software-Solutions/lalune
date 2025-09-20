@@ -6,12 +6,12 @@
 @endpush
 
 @section('content')
-    <div class="h-[30vh] md:h-[40vh] mx-6 rounded-3xl 
+    <div class="h-[30vh] md:h-[60vh] mx-6 rounded-3xl 
              bg-cover bg-top bg-no-repeat md:bg-fixed"
         style="background-image:url('{{ asset('images/index-hero.jpg') }}');">
         <!-- Optional overlay -->
         <div
-            class="w-full h-full bg-black/30 flex flex-col justify-evenly md:justify-between rounded-3xl backdrop:blur-sm px-8 py-4 text-center">
+            class="w-full h-full bg-black/30 flex flex-col justify-evenly rounded-3xl backdrop:blur-sm px-8 py-4 text-center">
             <div class="self-center">
                 <h1 class="text-2xl md:text-5xl font-bolder font-serif text-white/90">Made in Canada</h1>
                 <br>
@@ -199,7 +199,7 @@
                                         <div x-data="{ current: 0 }"
                                             class="relative flex justify-center items-center w-full h-[300px] overflow-hidden rounded-t-md p-2 bg-white">
 
-                                            <!-- Images -->
+                                            <!-- Main image -->
                                             <template x-for="(img, index) in item.images" :key="index">
                                                 <img x-show="current === index" x-transition
                                                     :src="`${storageBase}/${img.path}`"
@@ -207,7 +207,6 @@
                                                     class="h-full object-contain cursor-zoom-in rounded-md"
                                                     :alt="item.name">
                                             </template>
-
                                             <!-- Prev Arrow -->
                                             <button
                                                 @click="current = (current - 1 + item.images.length) % item.images.length"
@@ -220,16 +219,22 @@
                                                 class="absolute right-2 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/70 text-white rounded-full w-8 h-8 flex justify-center items-center">
                                                 &#10095;
                                             </button>
-
-                                            <!-- Dots -->
+                                            <!-- Thumbnail squares (bottom center) -->
                                             <div class="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2">
-                                                <template x-for="(img, index) in item.images" :key="index">
-                                                    <button @click="current = index"
-                                                        :class="current === index ? 'bg-black' : 'bg-gray-300'"
-                                                        class="w-2.5 h-2.5 rounded-full" aria-label="Show image"></button>
+                                                <template x-for="(thumb, tIndex) in item.images" :key="`thumb-${tIndex}`">
+                                                    <button type="button" @click="current = tIndex"
+                                                        class="w-8 h-8 sm:w-9 sm:h-9 rounded-[6px] overflow-hidden border-2 transition
+                     shadow-sm"
+                                                        :class="current === tIndex ?
+                                                            'border-white ring-2 ring-black/20' :
+                                                            'border-white/80 opacity-80 hover:opacity-100'">
+                                                        <img :src="`${storageBase}/${thumb.path}`" alt=""
+                                                            class="w-full h-full object-cover">
+                                                    </button>
                                                 </template>
                                             </div>
                                         </div>
+
 
                                     </template>
 
