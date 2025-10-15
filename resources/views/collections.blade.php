@@ -71,9 +71,25 @@
                                     <h3 class="text-lg montserrat-bold text-charcoal tracking-wide">
                                         {{ app()->getLocale() === 'ar' && $product->name_ar ? $product->name_ar : $product->name }}
                                     </h3>
-                                    <p class="mt-1 text-charcoal/90 font-mono">
-                                        {!! Str::limit(app()->getLocale() === 'ar' && $product->description_ar ? $product->description_ar : $product->description, 80) !!}
-                                    </p>
+                                    @php
+                                        // Choose localized HTML
+                                        $descHtml =
+                                            app()->getLocale() === 'ar' && $product->description_ar
+                                                ? $product->description_ar
+                                                : $product->description ?? '';
+
+                                        // Plain-text preview (no tags to break UI)
+                                        $descPreview = \Illuminate\Support\Str::limit(
+                                            trim(preg_replace('/\s+/', ' ', strip_tags($descHtml))),
+                                            120,
+                                        );
+
+                                        // Whitelist minimal tags for the modal (no scripts/iframes/etc.)
+                                        // Add/remove tags as you wish: <br><strong><em><ul><ol><li><p><b><i>
+                                        $descSafeHtml = strip_tags($descHtml, '<br><strong><em><ul><ol><li><p><b><i>');
+                                    @endphp
+
+                                    <p class="mt-1 text-charcoal/90 font-mono line-clamp-3">{{ $descPreview }}</p>
                                     <div class="flex items-center justify-between mt-2">
                                         @if ($product->discount_price)
                                             <!-- Discounted Price -->
