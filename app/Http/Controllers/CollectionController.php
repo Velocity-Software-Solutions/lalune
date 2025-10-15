@@ -12,6 +12,7 @@ class CollectionController extends Controller
     public function index()
     {
         $products = Product::with(['images', 'collection'])
+            ->where('status', 1)
             ->whereHas('collection', function ($q) {
                 $q->where('status', 1);
             })
