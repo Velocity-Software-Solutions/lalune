@@ -72,7 +72,7 @@
                                         {{ app()->getLocale() === 'ar' && $product->name_ar ? $product->name_ar : $product->name }}
                                     </h3>
                                     <p class="mt-1 text-charcoal/90 font-mono">
-                                        {{ Str::limit(app()->getLocale() === 'ar' && $product->description_ar ? $product->description_ar : $product->description, 80) }}
+                                        {!! Str::limit(app()->getLocale() === 'ar' && $product->description_ar ? $product->description_ar : $product->description, 80) !!}
                                     </p>
                                     <div class="flex items-center justify-between mt-2">
                                         @if ($product->discount_price)

@@ -213,7 +213,7 @@
             $recent = $approved->sortByDesc(fn($r) => $r->created_at ?? now())->take(5);
         @endphp
 
-        <div x-data="{ showReviewForm: false }" class="mt-16 m-4" id="reviews">
+        <div x-data="{ showReviewForm: false, showFullReview: false, fullReview: { author:'', date:'', rating:0, comment:'', image:'' } }" class="mt-16 m-4" id="reviews">
             <div class="flex items-center justify-between mb-3">
                 <h2 class="text-lg font-semibold text-black">Customer Reviews</h2>
 
@@ -239,7 +239,7 @@
                         $img = $rev->image_path ? asset('storage/' . $rev->image_path) : null;
                     @endphp
 
-                    <div class="shrink-0 snap-start w-52 rounded-lg border border-black/10 bg-white p-2">
+                    <div class="shrink-0 snap-start w-52 rounded-lg border border-black/10 bg-white p-2 flex flex-col justify-between items-center">
                         <div class="flex items-center gap-2">
                             {{-- tiny image --}}
                             @if ($img)
@@ -284,12 +284,41 @@
                                 </div>
                             </div>
                         </div>
-
                         @if ($rev->comment)
-                            <p class="mt-1 text-[12px] leading-snug text-gray-700 line-clamp-2">
-                                {{ Str::limit($rev->comment, 120) }}
-                            </p>
+                            <div class="mt-1 relative">
+                                {{-- scrollable text --}}
+                                <div class="max-h-24 overflow-y-auto pr-1 text-[12px] leading-snug text-gray-700">
+                                    {{ $rev->comment }}
+                                </div>
+
+                                {{-- soft gradient fades (top/bottom) --}}
+                                <div
+                                    class="pointer-events-none absolute inset-x-0 bottom-0 h-4 bg-gradient-to-t from-white to-transparent">
+                                </div>
+                            </div>
+
+                            {{-- read-full button (opens modal) --}}
+                            @php
+                                $author = $author ?? 'Anonymous';
+                                $created = optional($rev->created_at)->diffForHumans();
+                                $img = $rev->image_path ? asset('storage/' . $rev->image_path) : null;
+                                $rating = (float) ($rev->rating ?? 0);
+                            @endphp
+                            <button type="button" class="mt-2 text-[12px] font-medium text-black/80 hover:underline"
+                                @click="
+            showFullReview = true;
+            fullReview = {
+                author: @js($author),
+                date: @js($created),
+                rating: {{ $rating }},
+                comment: @js($rev->comment),
+                image: @js($img)
+            };
+        ">
+                                Read full review →
+                            </button>
                         @endif
+
                     </div>
                 @empty
                     <div class="rounded-lg border border-dashed border-black/10 bg-white p-4 text-center text-gray-600">
@@ -390,6 +419,64 @@
                     </form>
                 </div>
             </div>
+            {{-- ===== Modal: Read full review ===== --}}
+            <div x-cloak x-show="showFullReview" x-transition
+                class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
+                @keydown.escape.window="showFullReview=false" role="dialog" aria-modal="true">
+                <div class="w-full max-w-lg rounded-2xl bg-white p-5 shadow-xl ">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="min-w-0">
+                            <div class="flex items-center gap-2">
+                                <h3 class="text-base font-semibold text-black truncate"
+                                    x-text="fullReview.author || 'Anonymous'"></h3>
+                                <span class="text-[11px] text-gray-500" x-text="fullReview.date"></span>
+                            </div>
+                            {{-- stars --}}
+<!-- Replace the whole stars section with this -->
+<div class="mt-1 inline-flex items-center gap-0.5 text-amber-500"
+     :aria-label="`${fullReview.rating} out of 5`">
+  <template x-for="i in 5" :key="i">
+    <svg class="w-4 h-4" viewBox="0 0 16 16" aria-hidden="true">
+      <!-- outline square -->
+      <rect x="1" y="1" width="14" height="14" rx="2"
+            fill="none" stroke="currentColor" stroke-width="1.3"></rect>
+
+      <!-- fill square (full or partial) -->
+      <rect x="1" y="1"
+            :width="(() => {
+              const r = Number(fullReview.rating) || 0;
+              const full = Math.floor(r);
+              const hasHalf = (r - full) >= 0.5;
+              if (i <= full) return 14;              // full
+              if (i === full + 1 && hasHalf) return 7; // half
+              return 0;                               // empty
+            })()"
+            height="14" rx="2" fill="currentColor"></rect>
+    </svg>
+  </template>
+</div>
+
+                        </div>
+                        <button class="text-2xl leading-none -mr-1" @click="showFullReview=false">&times;</button>
+                    </div>
+
+                    <div class="space-y-3">
+                        <template x-if="fullReview.image">
+                            <img :src="fullReview.image" alt="Review image" class="w-full h-52 object-contain rounded-md">
+                        </template>
+
+                        <div class="relative">
+                            <div class="max-h-80 overflow-y-auto pr-2 text-sm text-gray-800 leading-relaxed"
+                                x-text="fullReview.comment"></div>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 flex items-center justify-end">
+                        <button class="px-3 py-2 rounded-md border text-sm" @click="showFullReview=false">Close</button>
+                    </div>
+                </div>
+            </div>
+
         </div>
 
 
