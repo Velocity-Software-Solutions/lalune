@@ -56,12 +56,12 @@
             {{-- Left Panel --}}
             <div class="w-full h-full">
                 {{-- Carousel --}}
-                <div class="relative w-full h-full rounded-lg overflow-hidden min-h-96">
+                <div class="relative w-full h-full rounded-lg overflow-hidden min-h-96 flex justify-center items-center">
                     <div>
                         <!-- Slides -->
                         <template x-for="(img, i) in displayImages" :key="i">
                             <div x-show="index === i" x-transition.opacity.duration.300ms
-                                class="absolute inset-0 flex items-center justify-center justify-self-center w-fit"
+                                class="flex items-center justify-center w-fit m-5"
                                 @mouseenter="paused = true; hover = true"
                                 @mouseleave="paused = false; hover = false; originX = 50; originY = 50"
                                 @mousemove="onMove($event)">
@@ -214,7 +214,7 @@
             $recent = $approved->sortByDesc(fn($r) => $r->created_at ?? now())->take(5);
         @endphp
 
-        <div x-data="{ showReviewForm: false, showFullReview: false, fullReview: { author:'', date:'', rating:0, comment:'', image:'' } }" class="mt-16 m-4" id="reviews">
+        <div x-data="{ showReviewForm: false, showFullReview: false, fullReview: { author: '', date: '', rating: 0, comment: '', image: '' } }" class="mt-16 m-4" id="reviews">
             <div class="flex items-center justify-between mb-3">
                 <h2 class="text-lg font-semibold text-black">Customer Reviews</h2>
 
@@ -240,7 +240,8 @@
                         $img = $rev->image_path ? asset('storage/' . $rev->image_path) : null;
                     @endphp
 
-                    <div class="shrink-0 snap-start w-52 rounded-lg border border-black/10 bg-white p-2 flex flex-col justify-between items-center">
+                    <div
+                        class="shrink-0 snap-start w-52 rounded-lg border border-black/10 bg-white p-2 flex flex-col justify-between items-center">
                         <div class="flex items-center gap-2">
                             {{-- tiny image --}}
                             @if ($img)
@@ -433,29 +434,29 @@
                                 <span class="text-[11px] text-gray-500" x-text="fullReview.date"></span>
                             </div>
                             {{-- stars --}}
-<!-- Replace the whole stars section with this -->
-<div class="mt-1 inline-flex items-center gap-0.5 text-amber-500"
-     :aria-label="`${fullReview.rating} out of 5`">
-  <template x-for="i in 5" :key="i">
-    <svg class="w-4 h-4" viewBox="0 0 16 16" aria-hidden="true">
-      <!-- outline square -->
-      <rect x="1" y="1" width="14" height="14" rx="2"
-            fill="none" stroke="currentColor" stroke-width="1.3"></rect>
+                            <!-- Replace the whole stars section with this -->
+                            <div class="mt-1 inline-flex items-center gap-0.5 text-amber-500"
+                                :aria-label="`${fullReview.rating} out of 5`">
+                                <template x-for="i in 5" :key="i">
+                                    <svg class="w-4 h-4" viewBox="0 0 16 16" aria-hidden="true">
+                                        <!-- outline square -->
+                                        <rect x="1" y="1" width="14" height="14" rx="2" fill="none"
+                                            stroke="currentColor" stroke-width="1.3"></rect>
 
-      <!-- fill square (full or partial) -->
-      <rect x="1" y="1"
-            :width="(() => {
-              const r = Number(fullReview.rating) || 0;
-              const full = Math.floor(r);
-              const hasHalf = (r - full) >= 0.5;
-              if (i <= full) return 14;              // full
-              if (i === full + 1 && hasHalf) return 7; // half
-              return 0;                               // empty
-            })()"
-            height="14" rx="2" fill="currentColor"></rect>
-    </svg>
-  </template>
-</div>
+                                        <!-- fill square (full or partial) -->
+                                        <rect x="1" y="1"
+                                            :width="(() => {
+                                                const r = Number(fullReview.rating) || 0;
+                                                const full = Math.floor(r);
+                                                const hasHalf = (r - full) >= 0.5;
+                                                if (i <= full) return 14; // full
+                                                if (i === full + 1 && hasHalf) return 7; // half
+                                                return 0; // empty
+                                            })()"
+                                            height="14" rx="2" fill="currentColor"></rect>
+                                    </svg>
+                                </template>
+                            </div>
 
                         </div>
                         <button class="text-2xl leading-none -mr-1" @click="showFullReview=false">&times;</button>
@@ -463,7 +464,8 @@
 
                     <div class="space-y-3">
                         <template x-if="fullReview.image">
-                            <img :src="fullReview.image" alt="Review image" class="w-full h-52 object-contain rounded-md">
+                            <img :src="fullReview.image" alt="Review image"
+                                class="w-full h-52 object-contain rounded-md">
                         </template>
 
                         <div class="relative">
