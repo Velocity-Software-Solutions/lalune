@@ -34,14 +34,26 @@
                                 </div>
                             </div>
                         @endif
-
+// Sara update october 16 2025
                         <div class="p-4">
-                            <h3 class="text-lg montserrat-bold text-charcoal tracking-wide">
-                                {{ app()->getLocale() === 'ar' && $product->name_ar ? $product->name_ar : $product->name }}
+                         <h3 class="text-lg montserrat-bold text-charcoal tracking-wide">
+                              {{ app()->getLocale() === 'ar' && $product->name_ar ? $product->name_ar : $product->name }}
                             </h3>
-                            <p class="mt-1 text-charcoal/90 font-mono">
-                                {{ Str::limit(app()->getLocale() === 'ar' && $product->description_ar ? $product->description_ar : $product->description, 80) }}
+                            
+                            @php
+                              $desc = app()->getLocale() === 'ar' && $product->description_ar
+                                  ? $product->description_ar
+                                  : $product->description;
+                            @endphp
+                            
+                            <p
+                              class="mt-1 text-charcoal/90 font-sans leading-snug tracking-normal
+                                     break-words hyphens-auto clamp-3"
+                              dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}"
+                            >
+                              {{ Str::limit(strip_tags($desc), 140) }}
                             </p>
+// end of Sara update //
                             <div class="flex items-center justify-between mt-2">
                                 @if ($product->discount_price)
                                     <!-- Discounted Price -->

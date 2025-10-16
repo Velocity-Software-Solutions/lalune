@@ -109,7 +109,8 @@
                 </p>
 
                 @if ($product->description)
-                    <h2 class="mb-2 text-2xl font-bold text-charcoal">{{ __('product.description') }}</h2>
+                    <h2 class="mb-2 text-2xl font-bold text-charcoal">
+                        {{ __('product.description') }}</h2>
                     {!! $product->description !!}
                 @endif
 
