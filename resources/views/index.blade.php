@@ -22,9 +22,9 @@
             <div class="space-y-2 text-white/85 text-xs md:text-base montserrat-regular self-center">
                 <p>Free Shipping on CAD 250+ with code <span class="text-white font-semibold">FREESHIP</span></p>
                 <div class="flex space-x-2 lg:space-x-6">
-                    <p>Save 10% on CAD 300+ with code <span class="text-white font-semibold">THANKS10</span></p>
-                    <p>Save 15% on CAD 400+ with code <span class="text-white font-semibold">THANKS15</span></p>
-                    <p>Save 20% on CAD 500+ with code <span class="text-white font-semibold">THANKS20</span></p>
+                    <!--<p>Save 10% on CAD 300+ with code <span class="text-white font-semibold">THANKS10</span></p>-->
+                    <!--<p>Save 15% on CAD 400+ with code <span class="text-white font-semibold">THANKS15</span></p>-->
+                    <!--<p>Save 20% on CAD 500+ with code <span class="text-white font-semibold">THANKS20</span></p>-->
                 </div>
             </div>
         </div>
