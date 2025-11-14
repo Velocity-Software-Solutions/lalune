@@ -219,12 +219,63 @@
         @yield('content')
     </main>
 
-    <footer class="py-6 mt-10 bg-gray-50 border-t">
-        <div class="mx-auto text-center text-gray-500 max-w-7xl">
-            &copy; {{ date('Y') }} {{ config('app.name', 'Al Khinjar Al Dhahbi') }}.
-            {{ __('messages.footer_rights') }}
+<footer class="py-8 mt-10 bg-gray-50 border-t">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div class="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+            {{-- Left: Newsletter --}}
+            <div class="text-left">
+                <h3 class="text-sm font-semibold text-gray-800">
+                    Stay updated
+                </h3>
+                <p class="mt-1 text-xs text-gray-500 max-w-sm">
+                    Subscribe for exclusive updates, new collections, and promo codes.
+                </p>
+
+                <form
+                    method="POST"
+                    action="{{ route('newsletter.subscribe') }}"
+                    class="mt-3 flex flex-col sm:flex-row gap-2 sm:gap-3"
+                >
+                    @csrf
+                    <input
+                        type="email"
+                        name="email"
+                        required
+                        placeholder="Enter your email"
+                        class="w-full sm:w-64 px-3 py-2 rounded-xl text-xs sm:text-sm
+                               border border-gray-300 bg-white
+                               placeholder-gray-400
+                               focus:outline-none focus:ring-2 focus:ring-black focus:border-black"
+                    />
+                                @error('email')
+                                    <p class="mt-1 text-[11px] text-red-600">{{ $message }}</p>
+                                @enderror
+                    <button
+                        type="submit"
+                        class="inline-flex items-center justify-center px-4 py-2 rounded-xl
+                               text-xs sm:text-sm font-semibold text-white
+                               bg-gradient-to-r from-black via-neutral-700 to-black
+                               bg-[length:200%_100%] bg-left hover:bg-right
+                               transition-all duration-500"
+                    >
+                        Subscribe
+                    </button>
+                </form>
+
+                <p class="mt-1 text-[10px] text-gray-400">
+                    By subscribing, you agree to receive marketing emails. You can unsubscribe at any time.
+                </p>
+            </div>
+
+            {{-- Right: Copyright --}}
+            <div class="text-center md:text-right text-gray-500 text-xs sm:text-sm">
+                &copy; {{ date('Y') }} {{ config('app.name', 'Al Khinjar Al Dhahbi') }}.
+                {{ __('messages.footer_rights') }}
+            </div>
         </div>
-    </footer>
+    </div>
+</footer>
+
 </body>
 
 </html>

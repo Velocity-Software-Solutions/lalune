@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\CollectionController;
 use App\Http\Controllers\ContactController;
+use App\Http\Controllers\NewsletterSubscriptionController;
 use App\Http\Controllers\ProductReviewController;
 use App\Http\Middleware\SetLocale;
 use Illuminate\Support\Facades\Route;
@@ -31,6 +32,14 @@ Route::get('/about-us', function () {
 
 //Contact Form Submisssion
 Route::post('contact', [ContactController::class, 'submit'])->name('contact.submit');
+
+// Newsletter routes
+Route::post('/newsletter/subscribe', [NewsletterSubscriptionController::class, 'store'])
+    ->name('newsletter.subscribe');
+Route::get('/newsletter/confirm/{token}', [NewsletterSubscriptionController::class, 'confirm'])
+    ->name('newsletter.confirm');
+Route::get('/newsletter/unsubscribe/{token}', [NewsletterSubscriptionController::class, 'unsubscribe'])
+    ->name('newsletter.unsubscribe');
 
 //Return Policy
 Route::get('/return-policy', function () {

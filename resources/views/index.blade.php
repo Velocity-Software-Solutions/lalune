@@ -321,6 +321,67 @@
             </div>
         </div>
     </div>
+    {{-- Email subscribe popup (bottom-left) --}}
+    {{-- Email subscribe popup (bottom-left) --}}
+    <div x-data="{
+        open: !localStorage.getItem('email_popup_closed'),
+        email: '',
+        close() {
+            this.open = false;
+            localStorage.setItem('email_popup_closed', '1');
+        }
+    }" x-show="open" x-transition x-cloak
+        class="fixed bottom-4 left-4 z-50 w-[92vw] max-w-xs sm:max-w-sm">
+        <div
+            class="relative p-4 sm:p-5 rounded-2xl shadow-2xl
+               bg-black/60 border border-white/30
+               backdrop-blur-xl
+               text-white/90">
+            <!-- Close button -->
+            <button type="button" @click="close()"
+                class="absolute top-2 right-2 w-7 h-7 rounded-full
+                   bg-black/50 hover:bg-black/70
+                   flex items-center justify-center text-xs">
+                ✕
+            </button>
+
+            <h3 class="text-sm sm:text-base font-semibold mb-1">
+                Get exclusive updates & promo codes
+            </h3>
+            <p class="text-[11px] sm:text-xs mb-3 text-white/80">
+                Join our list for early access to new collections, special offers,
+                and members-only promo codes.
+            </p>
+
+            <form method="POST" action="{{ route('newsletter.subscribe') }}" class="space-y-2">
+                @csrf
+                <input type="email" name="email" x-model="email" required placeholder="Enter your email"
+                    class="w-full px-3 py-2 rounded-xl text-xs sm:text-sm
+                       bg-white/10 border border-white/40
+                       placeholder-white/70
+                       focus:outline-none focus:ring-2 focus:ring-white/70
+                       focus:border-transparent" />
+
+                <button type="submit"
+                    class="w-full px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold
+                       bg-gradient-to-r from-black via-neutral-700 to-black
+                       bg-[length:200%_100%] bg-left hover:bg-right
+                       transition-all duration-500
+                       shadow-lg shadow-black/40"
+                    @click="if(email){ localStorage.setItem('email_popup_closed','1'); }">
+                    Subscribe now
+                </button>
+            </form>
+
+            <p class="mt-2 text-[10px] text-white/60 leading-snug">
+                By subscribing, you agree to receive marketing emails from
+                <span class="font-semibold">Lalune By NE</span>.
+                You can unsubscribe at any time.
+                {{-- Optionally: --}}
+                {{-- See our <a href="{{ route('privacy') }}" class="underline">Privacy Policy</a>. --}}
+            </p>
+        </div>
+    </div>
 
     <script>
         function page(products = [], categories = [], storageBase = '', sizeOptions = []) {
