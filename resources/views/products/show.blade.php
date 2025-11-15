@@ -20,7 +20,16 @@
             ->values();
     @endphp
 
-
+    @if ($errors->any())
+        <div class="mb-4 p-4 bg-red-50 border border-red-300 text-red-700 rounded">
+            <p class="font-semibold mb-2">Please fix the following errors:</p>
+            <ul class="list-disc list-inside text-sm">
+                @foreach ($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
     <div class="min-h-screen py-3" x-data="{ showModal: false, modalImage: '' }">
         <div x-data="productPage(@js([
     'images' => $product->images
@@ -61,8 +70,7 @@
                         <!-- Slides -->
                         <template x-for="(img, i) in displayImages" :key="i">
                             <div x-show="index === i" x-transition.opacity.duration.300ms
-                                class="flex items-center justify-center w-fit m-5"
-                                @mouseenter="paused = true; hover = true"
+                                class="flex items-center justify-center w-fit m-5" @mouseenter="paused = true; hover = true"
                                 @mouseleave="paused = false; hover = false; originX = 50; originY = 50"
                                 @mousemove="onMove($event)">
                                 <img :src="img.src" :alt="img.alt"

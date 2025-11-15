@@ -14,7 +14,7 @@ class ProductReviewController extends Controller
         'author_name'  => 'required|string|max:100',
         'author_email' => 'nullable|email|max:150',
         'rating'       => 'required|numeric|min:0.5|max:5',
-        'comment'      => 'required|string|max:2000',
+        'comment'      => 'nullable|string|max:2000',
         'image'        => 'nullable|image|max:4096', // 4MB
     ], [
         'author_name.required' => 'Please enter your name.',
@@ -36,7 +36,7 @@ class ProductReviewController extends Controller
         'author_name' => $data['author_name'],
         'author_email'=> $data['author_email'] ?? null,
         'rating'      => $data['rating'],
-        'comment'     => $data['comment'],
+        'comment'     => $data['comment'] ?? null,
         'image_path'  => $path,
         'status'      => 'pending', // or 'approved' if auto-approve
     ]);
