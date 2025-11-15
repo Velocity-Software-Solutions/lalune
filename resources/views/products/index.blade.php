@@ -34,7 +34,7 @@
                                 </div>
                             </div>
                         @endif
-// Sara update october 16 2025
+<!-- Sara update october 16 2025 -->
                         <div class="p-4">
                          <h3 class="text-lg montserrat-bold text-charcoal tracking-wide">
                               {{ app()->getLocale() === 'ar' && $product->name_ar ? $product->name_ar : $product->name }}
@@ -53,7 +53,7 @@
                             >
                               {{ Str::limit(strip_tags($desc), 140) }}
                             </p>
-// end of Sara update //
+<!-- end of Sara update -->
                             <div class="flex items-center justify-between mt-2">
                                 @if ($product->discount_price)
                                     <!-- Discounted Price -->
