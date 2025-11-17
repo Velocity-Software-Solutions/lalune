@@ -15,7 +15,7 @@ return new class extends Migration {
             $table->string('name');      // internal name, e.g. "Autumn Drop #1"
             $table->string('subject');   // email subject
             $table->unsignedBigInteger('template_id')->nullable();
-            $table->longText('body')->nullable()->after('subject');
+            $table->longText('body')->nullable();
             $table->enum('status', ['draft', 'scheduled', 'sending', 'sent'])->default('draft');
             $table->string('segment')->nullable(); // e.g. 'subscribed', or JSON for filters later
             $table->timestamp('scheduled_for')->nullable();
