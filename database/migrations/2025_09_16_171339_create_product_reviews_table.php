@@ -15,7 +15,7 @@ return new class extends Migration {
             $table->foreignId('product_id')->constrained()->cascadeOnDelete();
             $table->foreignId('user_id')->nullable()->constrained()->nullOnDelete();
             $table->string("author_name");
-            $table->string("author_email");
+            $table->string("author_email")->nullable();
             // rating in 0.5 steps (0.5 … 5.0)
             $table->decimal('rating', 2, 1); // e.g. 4.5
             $table->text('comment')->nullable();

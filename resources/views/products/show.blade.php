@@ -357,7 +357,7 @@
                                 <label class="block text-xs text-gray-700 mb-1">Your name</label>
                                 <input type="text" name="author_name"
                                     value="{{ old('author_name', optional(auth()->user())->name) }}"
-                                    class="w-full text-sm rounded-md border-gray-300 focus:border-black focus:ring-black">
+                                    class="w-full text-sm rounded-md border border-gray-300 focus:border-black focus:ring-black">
                                 @error('author_name')
                                     <p class="mt-1 text-[11px] text-red-600">{{ $message }}</p>
                                 @enderror
@@ -366,7 +366,7 @@
                                 <label class="block text-xs text-gray-700 mb-1">Email (not published)</label>
                                 <input type="email" name="author_email"
                                     value="{{ old('author_email', optional(auth()->user())->email) }}"
-                                    class="w-full text-sm rounded-md border-gray-300 focus:border-black focus:ring-black">
+                                    class="w-full text-sm rounded-md border border-gray-300 focus:border-black focus:ring-black">
                                 @error('author_email')
                                     <p class="mt-1 text-[11px] text-red-600">{{ $message }}</p>
                                 @enderror

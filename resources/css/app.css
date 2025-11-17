@@ -3,6 +3,9 @@
 @tailwind components;
 @tailwind utilities;
 
+body{
+  overflow: auto;
+}
 /* app.css or a custom stylesheet loaded after Tailwind */
 ol, ul {
   list-style: revert;

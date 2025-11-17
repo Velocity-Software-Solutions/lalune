@@ -22,7 +22,5 @@ class NewsletterSubscriber extends Model
         'confirmed_at'    => 'datetime',
         'subscribed_at'   => 'datetime',
         'unsubscribed_at' => 'datetime',
-        'last_opened_at'  => 'datetime',
-        'last_clicked_at' => 'datetime',
     ];
 }

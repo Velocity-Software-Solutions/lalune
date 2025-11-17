@@ -21,8 +21,6 @@ return new class extends Migration {
             $table->timestamp('confirmed_at')->nullable();
             $table->timestamp('subscribed_at')->nullable();
             $table->timestamp('unsubscribed_at')->nullable();
-            $table->timestamp('last_opened_at')->nullable();
-            $table->timestamp('last_clicked_at')->nullable();
             $table->timestamps();
         });
     }

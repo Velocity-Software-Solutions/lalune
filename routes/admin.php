@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\Admin\CategoryController;
+use App\Http\Controllers\Admin\NewsletterCampaignController;
+use App\Http\Controllers\Admin\NewsletterSubscriberController;
 use App\Http\Controllers\Admin\ProductReviewController;
 use App\Http\Controllers\Admin\PromoCodeController;
 use App\Http\Controllers\Admin\DashboardController;
@@ -36,4 +38,41 @@ Route::middleware(['auth', IsAdmin::class])->group(function () {
 
     Route::post('/upload-summernote-image', [SummernoteController::class, 'store']);
     Route::delete('/delete-summernote-image', [SummernoteController::class, 'destroy']);
+    // routes/web.php or routes/admin.php
+    Route::prefix('newsletter')
+        ->name('newsletter.')
+        ->group(function () {
+            Route::get('/subscribers', [NewsletterSubscriberController::class, 'index'])->name('subscribers.index');
+            Route::get('/subscribers/{subscriber}', [NewsletterSubscriberController::class, 'show'])->name('subscribers.show');
+            Route::post('/subscribers/{subscriber}/resend-confirm', [NewsletterSubscriberController::class, 'resendConfirm'])
+                ->name('subscribers.resend-confirm');
+
+            Route::post('/subscribers/{subscriber}/unsubscribe', [NewsletterSubscriberController::class, 'unsubscribe'])
+                ->name('subscribers.unsubscribe');
+            Route::get('/campaigns', [NewsletterCampaignController::class, 'index'])
+                ->name('campaigns.index');
+
+            Route::get('/campaigns/create', [NewsletterCampaignController::class, 'create'])
+                ->name('campaigns.create');
+
+            Route::post('/campaigns', [NewsletterCampaignController::class, 'store'])
+                ->name('campaigns.store');
+
+            Route::get('/campaigns/{campaign}/edit', [NewsletterCampaignController::class, 'edit'])
+                ->name('campaigns.edit');
+
+            Route::put('/campaigns/{campaign}', [NewsletterCampaignController::class, 'update'])
+                ->name('campaigns.update');
+
+            Route::get('campaigns/{campaign}/preview', [NewsletterCampaignController::class, 'preview'])
+                ->name('campaigns.preview');
+            Route::post('campaigns/{campaign}/send-test', [NewsletterCampaignController::class, 'sendTest'])
+                ->name('campaigns.send-test');
+            Route::post('campaigns/{campaign}/send', [NewsletterCampaignController::class, 'send'])
+                ->name('campaigns.send');
+
+            Route::resource('templates', NewsletterTemplateController::class)
+                ->except(['show', 'destroy']); // up to you
+        });
+
 });
