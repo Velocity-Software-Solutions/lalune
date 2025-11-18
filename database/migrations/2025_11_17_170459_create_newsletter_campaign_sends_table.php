@@ -15,7 +15,7 @@ return new class extends Migration {
             $table->foreignId('campaign_id')->constrained('newsletter_campaigns')->onDelete('cascade');
             $table->foreignId('subscriber_id')->constrained('newsletter_subscribers')->onDelete('cascade');
 
-            $table->enum('status', ['pending', 'sent', 'failed'])->default('pending');
+            $table->enum('status', ['pending', 'sent', 'failed','scheduled'])->default('pending');
             $table->timestamp('sent_at')->nullable();
             $table->timestamp('opened_at')->nullable();
             $table->timestamp('clicked_at')->nullable();

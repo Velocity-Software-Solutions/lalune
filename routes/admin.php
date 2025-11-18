@@ -11,7 +11,7 @@ use App\Http\Controllers\Admin\ShippingOptionController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\Admin\CollectionController;
 use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\SummernoteController;
+use App\Http\Controllers\Admin\SummernoteController;
 use App\Http\Middleware\IsAdmin;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\OrderController;

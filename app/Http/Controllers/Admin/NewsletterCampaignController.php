@@ -164,54 +164,80 @@ class NewsletterCampaignController extends Controller
         ));
     }
 
-    public function update(Request $request, NewsletterCampaign $campaign)
-    {
-        $data = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'subject' => ['required', 'string', 'max:255'],
-            'body' => ['required', 'string'],
-            'segment' => ['required', 'in:all_subscribed,only_pending,custom_subscribers'],
-            'subscriber_ids' => ['nullable', 'array'],
-            'subscriber_ids.*' => ['integer', 'exists:newsletter_subscribers,id'],
-            'scheduled_for' => ['nullable', 'date'],
-        ]);
+public function update(Request $request, NewsletterCampaign $campaign)
+{
+    $data = $request->validate([
+        'name'    => ['required', 'string', 'max:255'],
+        'subject' => ['required', 'string', 'max:255'],
+        'body'    => ['required', 'string'],
+        'segment' => ['required', 'in:all_subscribed,only_pending,custom_subscribers'],
+        'subscriber_ids'   => ['nullable', 'array'],
+        'subscriber_ids.*' => ['integer', 'exists:newsletter_subscribers,id'],
+        'scheduled_for'    => ['nullable', 'date'],
+    ]);
 
-        if ($data['segment'] === 'custom_subscribers' && empty($data['subscriber_ids'])) {
-            return back()
-                ->withInput()
-                ->withErrors([
-                    'subscriber_ids' => 'Please select at least one subscriber when using "Specific subscribers".',
-                ]);
-        }
-
-        $scheduledFor = !empty($data['scheduled_for'])
-            ? Carbon::parse($data['scheduled_for'])
-            : null;
-
-        // 👉 Create a brand new campaign instead of updating the old one
-        $newCampaign = NewsletterCampaign::create([
-            'name' => $data['name'],
-            'subject' => $data['subject'],
-            'body' => $data['body'],
-            'segment' => $data['segment'],
-            'status' => $scheduledFor ? 'scheduled' : 'draft',
-            'scheduled_for' => $scheduledFor,
-            // if you have template_id or other fields, carry them over:
-            // 'template_id' => $campaign->template_id,
-        ]);
-
-        // If you have a pivot relationship like:
-        // public function subscribers() { return $this->belongsToMany(NewsletterSubscriber::class, 'newsletter_campaign_subscriber'); }
-        if ($data['segment'] === 'custom_subscribers' && !empty($data['subscriber_ids'])) {
-            $newCampaign->subscribers()->sync($data['subscriber_ids']);
-        }
-
-        // If your store() also creates sends & queues jobs,
-        // you can call a shared method here instead of duplicating that logic.
-        // e.g. $this->createSendsForCampaign($newCampaign);
-
-        return redirect()
-            ->route('admin.newsletter.campaigns.edit', $newCampaign)
-            ->with('success', 'Campaign duplicated and saved as a new campaign.');
+    if ($data['segment'] === 'custom_subscribers' && empty($data['subscriber_ids'])) {
+        return back()
+            ->withInput()
+            ->withErrors([
+                'subscriber_ids' => 'Please select at least one subscriber when using "Specific subscribers".',
+            ]);
     }
+
+    $scheduledFor = !empty($data['scheduled_for'])
+        ? Carbon::parse($data['scheduled_for'])
+        : null;
+
+    // 👉 Create a brand new campaign instead of updating the old one
+    $newCampaign = NewsletterCampaign::create([
+        'name'          => $data['name'],
+        'subject'       => $data['subject'],
+        'body'          => $data['body'],
+        'segment'       => $data['segment'],
+        'status'        => $scheduledFor ? 'scheduled' : 'draft',
+        'scheduled_for' => $scheduledFor,
+        // If you have extra fields, carry them over:
+        // 'template_id' => $campaign->template_id,
+    ]);
+
+    /*
+     * Build recipient list based on segment
+     */
+    if ($data['segment'] === 'custom_subscribers') {
+        $recipients = NewsletterSubscriber::whereIn('id', $data['subscriber_ids'] ?? [])->get();
+    } elseif ($data['segment'] === 'only_pending') {
+        $recipients = NewsletterSubscriber::where('status', 'pending')->get();
+    } else { // all_subscribed
+        $recipients = NewsletterSubscriber::where('status', 'subscribed')->get();
+    }
+
+    /*
+     * Create NewsletterCampaignSend rows with 5-minute spacing
+     */
+    if ($recipients->isNotEmpty()) {
+        $baseTime = $scheduledFor ?? now();
+        $index    = 0;
+
+        foreach ($recipients as $subscriber) {
+            $sendAt = (clone $baseTime)->addMinutes($index * 5);
+
+            $send = NewsletterCampaignSend::create([
+                'campaign_id'   => $newCampaign->id,
+                'subscriber_id' => $subscriber->id,
+                'status'        => 'scheduled',   // or 'pending', depending on how your worker picks them up
+                'scheduled_for' => $sendAt,
+            ]);
+
+            // If you are dispatching jobs with delay, you can hook here:
+            SendNewsletterCampaignEmail::dispatch($send->id)->delay($sendAt);
+
+            $index++;
+        }
+    }
+
+    return redirect()
+        ->route('admin.newsletter.campaigns.edit', $newCampaign)
+        ->with('success', 'Campaign duplicated and saved as a new campaign.');
+}
+
 }

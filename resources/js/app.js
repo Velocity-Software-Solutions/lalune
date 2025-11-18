@@ -39,12 +39,14 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 
-//     document.getElementById("file-upload")
-//         .addEventListener("change", function () {
-//             const fileName =
-//                 this.files.length > 0 ? this.files[0].name : "No file chosen";
-//             document.getElementById("file-name").textContent = fileName;
-//         });
+    document
+        .getElementById("file-upload")
+        .addEventListener("change", function () {
+            const fileName =
+                this.files.length > 0 ? this.files[0].name : "No file chosen";
+            document.getElementById("file-name").textContent = fileName;
+        });
+});
 
 function typeText(el, text, delay = 50) {
     let i = 0;
@@ -99,4 +101,3 @@ const observer = new IntersectionObserver((entries, observer) => {
             link.classList.add("active");
         }
     });
-});
