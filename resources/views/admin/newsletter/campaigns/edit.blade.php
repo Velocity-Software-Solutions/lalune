@@ -1,3 +1,4 @@
+    <!-- It is not the man who has too little, but the man who craves more, that is poor. - Seneca -->
 @extends('layouts.admin')
 
 @push('head')
@@ -5,43 +6,6 @@
 @endpush
 
 @section('content')
-<style>
-        h1 {
-            font-size: 2.25rem;
-            /* 36px */
-            font-weight: 700;
-        }
-
-        h2 {
-            font-size: 1.875rem;
-            /* 30px */
-            font-weight: 600;
-        }
-
-        h3 {
-            font-size: 1.5rem;
-            /* 24px */
-            font-weight: 600;
-        }
-
-        h4 {
-            font-size: 1.25rem;
-            /* 20px */
-            font-weight: 500;
-        }
-
-        h5 {
-            font-size: 1rem;
-            /* 16px */
-            font-weight: 500;
-        }
-
-        h6 {
-            font-size: 0.875rem;
-            /* 14px */
-            font-weight: 500;
-        }
-    </style>
 <div class="max-w-6xl mx-auto px-4 py-8">
 
     {{-- Flash --}}
@@ -59,10 +23,39 @@
     {{-- Header --}}
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
-            <h1 class="text-2xl font-semibold text-gray-900">Create Campaign</h1>
+            <h1 class="text-2xl font-semibold text-gray-900">
+                Edit Campaign
+            </h1>
             <p class="text-sm text-gray-500">
-                Draft a LaLune by NE newsletter and preview it in real time.
+                Update your LaLune by NE campaign details and preview the email in real time.
             </p>
+
+            <div class="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                <span class="inline-flex items-center rounded-full px-2.5 py-0.5 border
+                             @if($campaign->status === 'sent')
+                                 bg-emerald-50 text-emerald-700 border-emerald-200
+                             @elseif($campaign->status === 'scheduled')
+                                 bg-amber-50 text-amber-700 border-amber-200
+                             @elseif($campaign->status === 'sending')
+                                 bg-sky-50 text-sky-700 border-sky-200
+                             @else
+                                 bg-gray-50 text-gray-700 border-gray-200
+                             @endif">
+                    Status: {{ ucfirst($campaign->status) }}
+                </span>
+
+                @if($campaign->scheduled_for)
+                    <span class="text-gray-500">
+                        Scheduled for: {{ $campaign->scheduled_for->format('Y-m-d H:i') }}
+                    </span>
+                @endif
+
+                @if($campaign->sent_at)
+                    <span class="text-gray-500">
+                        Sent at: {{ $campaign->sent_at->format('Y-m-d H:i') }}
+                    </span>
+                @endif
+            </div>
         </div>
 
         <a href="{{ route('admin.newsletter.campaigns.index') }}"
@@ -80,8 +73,9 @@
                 Campaign details
             </h2>
 
-            <form method="POST" action="{{ route('admin.newsletter.campaigns.store') }}" class="space-y-4">
+            <form method="POST" action="{{ route('admin.newsletter.campaigns.update', $campaign) }}" class="space-y-4">
                 @csrf
+                @method('PUT')
 
                 {{-- Name --}}
                 <div>
@@ -92,7 +86,7 @@
                         type="text"
                         name="name"
                         id="name-input"
-                        value="{{ old('name') }}"
+                        value="{{ old('name', $campaign->name) }}"
                         class="w-full px-3 py-2 rounded-lg border text-sm
                                border-gray-300 focus:outline-none focus:ring-2 focus:ring-black focus:border-black"
                         placeholder="e.g. New Drop – Moonlight Collection"
@@ -112,7 +106,7 @@
                         type="text"
                         name="subject"
                         id="subject-input"
-                        value="{{ old('subject') }}"
+                        value="{{ old('subject', $campaign->subject) }}"
                         class="w-full px-3 py-2 rounded-lg border text-sm
                                border-gray-300 focus:outline-none focus:ring-2 focus:ring-black focus:border-black"
                         placeholder="e.g. Meet LaLune – a new chapter in your night ritual"
@@ -130,7 +124,7 @@
                     </label>
 
                     @php
-                        $oldSegment = old('segment', 'all_subscribed');
+                        $currentSegment = old('segment', $campaign->segment ?? 'all_subscribed');
                     @endphp
 
                     <div class="space-y-1 text-xs text-gray-700">
@@ -140,7 +134,7 @@
                                 name="segment"
                                 value="all_subscribed"
                                 class="text-black border-gray-300 focus:ring-black"
-                                {{ $oldSegment === 'all_subscribed' ? 'checked' : '' }}
+                                {{ $currentSegment === 'all_subscribed' ? 'checked' : '' }}
                             >
                             <span>All subscribed</span>
                         </label>
@@ -151,7 +145,7 @@
                                 name="segment"
                                 value="only_pending"
                                 class="text-black border-gray-300 focus:ring-black"
-                                {{ $oldSegment === 'only_pending' ? 'checked' : '' }}
+                                {{ $currentSegment === 'only_pending' ? 'checked' : '' }}
                             >
                             <span>Only pending (resend confirm)</span>
                         </label>
@@ -162,7 +156,7 @@
                                 name="segment"
                                 value="custom_subscribers"
                                 class="text-black border-gray-300 focus:ring-black"
-                                {{ $oldSegment === 'custom_subscribers' ? 'checked' : '' }}
+                                {{ $currentSegment === 'custom_subscribers' ? 'checked' : '' }}
                             >
                             <span>Specific subscribers</span>
                         </label>
@@ -176,7 +170,7 @@
                     <div
                         id="custom-subscribers-box"
                         class="mt-2"
-                        style="display: {{ $oldSegment === 'custom_subscribers' ? 'block' : 'none' }};"
+                        style="display: {{ $currentSegment === 'custom_subscribers' ? 'block' : 'none' }};"
                     >
                         <label class="block text-[11px] font-medium text-gray-600 mb-1">
                             Choose subscribers
@@ -188,10 +182,14 @@
                                    border-gray-300 focus:outline-none focus:ring-2 focus:ring-black focus:border-black
                                    h-40"
                         >
+                            @php
+                                $selectedIds = collect(old('subscriber_ids', $selectedSubscriberIds ?? []))->map(fn($id) => (int) $id);
+                            @endphp
+
                             @foreach($subscribers as $sub)
                                 <option
                                     value="{{ $sub->id }}"
-                                    @if(collect(old('subscriber_ids', []))->contains($sub->id)) selected @endif
+                                    @if($selectedIds->contains($sub->id)) selected @endif
                                 >
                                     {{ $sub->email }} ({{ $sub->status }})
                                 </option>
@@ -218,7 +216,7 @@
                     <input
                         type="datetime-local"
                         name="scheduled_for"
-                        value="{{ old('scheduled_for') }}"
+                        value="{{ old('scheduled_for', optional($campaign->scheduled_for)->format('Y-m-d\TH:i')) }}"
                         class="w-full px-3 py-2 rounded-lg border text-sm
                                border-gray-300 focus:outline-none focus:ring-2 focus:ring-black focus:border-black"
                     />
@@ -226,7 +224,7 @@
                         <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
                     @enderror
                     <p class="mt-1 text-[11px] text-gray-500">
-                        Leave empty to start sending immediately (still spaced 5 minutes apart).
+                        Leave empty to keep it unscheduled and send manually later.
                     </p>
                 </div>
 
@@ -239,7 +237,7 @@
                         class="summernote-editor"
                         name="body"
                         id="body-editor"
-                    >{!! old('body', '') !!}</textarea>
+                    >{!! old('body', $campaign->body) !!}</textarea>
 
                     @error('body')
                         <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
@@ -250,14 +248,20 @@
                     </p>
                 </div>
 
-                {{-- Submit --}}
-                <div class="pt-2 flex justify-end">
+                {{-- Actions --}}
+                <div class="pt-2 flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex items-center gap-2 text-[11px] text-gray-500">
+                        <span>Created: {{ $campaign->created_at->format('Y-m-d H:i') }}</span>
+                        <span class="text-gray-300">•</span>
+                        <span>Last updated: {{ $campaign->updated_at->format('Y-m-d H:i') }}</span>
+                    </div>
+
                     <button
                         type="submit"
                         class="inline-flex items-center justify-center px-4 py-2 rounded-full
                                text-sm font-semibold text-white bg-black hover:bg-gray-900 transition"
                     >
-                        Save & schedule campaign
+                        Save changes
                     </button>
                 </div>
             </form>
@@ -299,7 +303,7 @@
                         class="text-sm text-gray-900 font-medium"
                         id="subject-preview"
                     >
-                        {{ old('subject') ?: 'Your subject will appear here' }}
+                        {{ old('subject', $campaign->subject) ?: 'Your subject will appear here' }}
                     </div>
                 </div>
 
@@ -310,7 +314,7 @@
                         class="prose prose-sm max-w-none prose-headings:mt-3 prose-headings:mb-1
                                prose-p:mb-2 prose-a:text-black prose-a:underline"
                     >
-                        {!! old('body') ?: '
+                        {!! old('body', $campaign->body) ?: '
                             <p>Start writing your LaLune story here. This is just a placeholder preview.</p>
                             <p>You can style headings, paragraphs, links and more using the editor on the left.</p>
                         ' !!}
@@ -335,6 +339,7 @@
         const segmentRadios = document.querySelectorAll('input[name="segment"]');
         const customBox = document.getElementById('custom-subscribers-box');
         function refreshCustomBox() {
+            if (!customBox) return;
             const selected = document.querySelector('input[name="segment"]:checked');
             if (selected && selected.value === 'custom_subscribers') {
                 customBox.style.display = 'block';
@@ -375,16 +380,21 @@
         function updateBodyPreview(contents) {
             if (!bodyPreview) return;
             const html = (contents || '').trim();
-            bodyPreview.innerHTML = html || contents ;
+            bodyPreview.innerHTML = html || defaultBody;
         }
 
-        // Listen for Summernote change events (summernote.js already initializes the editor)
+        // Summernote change listener (summernote.js already initializes the editor)
+        if (typeof $ !== 'undefined' && $.fn && $.fn.summernote) {
             $('.summernote-editor').on('summernote.change', function (we, contents) {
-                console.log(contents)
                 updateBodyPreview(contents);
             });
-        
+
+            // Initial sync from editor content
+            const initialContents = $('.summernote-editor').summernote('code');
+            updateBodyPreview(initialContents);
+        } else {
+            updateBodyPreview(null);
+        }
     });
 </script>
 @endsection
-

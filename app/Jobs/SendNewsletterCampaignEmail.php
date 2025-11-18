@@ -1,6 +1,7 @@
 <?php
 namespace App\Jobs;
 
+use App\Mail\NewsletterCampaignMail;
 use App\Models\NewsletterCampaignSend;
 use App\Models\NewsletterCampaign;
 use App\Models\NewsletterSubscriber;
@@ -22,47 +23,53 @@ class SendNewsletterCampaignEmail implements ShouldQueue
         $this->sendId = $sendId;
     }
 
-    public function handle(): void
-    {
-        $send = NewsletterCampaignSend::with(['campaign', 'subscriber'])->find($this->sendId);
 
-        if (! $send || ! $send->campaign || ! $send->subscriber) {
-            return;
-        }
+public function handle(): void
+{
+    $send = NewsletterCampaignSend::with(['campaign', 'subscriber'])->find($this->sendId);
 
-        $campaign   = $send->campaign;
-        $subscriber = $send->subscriber;
-
-        // If already sent or failed, skip
-        if ($send->status === 'sent' || $send->status === 'failed') {
-            return;
-        }
-
-        // Basic safety check: don't send to unsubscribed
-        if ($subscriber->status === 'unsubscribed') {
-            $send->update([
-                'status'        => 'failed',
-                'error_message' => 'Subscriber is unsubscribed.',
-            ]);
-            return;
-        }
-
-        // Send the mail (you can swap to a dedicated Mailable if you prefer)
-        Mail::mailer('noreply')->send(
-            'emails.newsletter.campaign', // view
-            [
-                'campaign'   => $campaign,
-                'subscriber' => $subscriber,
-            ],
-            function ($message) use ($campaign, $subscriber) {
-                $message->to($subscriber->email)
-                    ->subject($campaign->subject);
-            }
-        );
-
-        $send->update([
-            'status'  => 'sent',
-            'sent_at' => now(),
-        ]);
+    if (! $send || ! $send->campaign || ! $send->subscriber) {
+        return;
     }
+
+    $campaign   = $send->campaign;
+    $subscriber = $send->subscriber;
+
+    if ($send->status === 'sent' || $send->status === 'failed') {
+        return;
+    }
+
+    // Don’t send to unsubscribed
+    if ($subscriber->status === 'unsubscribed') {
+        $send->update([
+            'status'        => 'failed',
+            'error_message' => 'Subscriber is unsubscribed.',
+        ]);
+        return;
+    }
+
+    // Build URLs (adjust these routes to match your app)
+        $unsubscribeUrl = route('newsletter.unsubscribe', $subscriber->email); // or your real URL
+
+
+    $webviewUrl = null;
+    // If you later create a webview route:
+    // $webviewUrl = route('newsletter.campaign.webview', $campaign);
+
+    // Send via mailable
+    Mail::mailer('noreply')
+        ->to($subscriber->email)
+        ->send(new NewsletterCampaignMail(
+            $campaign,
+            $subscriber,
+            $unsubscribeUrl,
+            $webviewUrl
+        ));
+
+    $send->update([
+        'status'  => 'sent',
+        'sent_at' => now(),
+    ]);
+}
+
 }

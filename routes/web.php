@@ -38,7 +38,7 @@ Route::post('/newsletter/subscribe', [NewsletterSubscriptionController::class, '
     ->name('newsletter.subscribe');
 Route::get('/newsletter/confirm/{token}', [NewsletterSubscriptionController::class, 'confirm'])
     ->name('newsletter.confirm');
-Route::get('/newsletter/unsubscribe/{token}', [NewsletterSubscriptionController::class, 'unsubscribe'])
+Route::get('/newsletter/unsubscribe/{email}', [NewsletterSubscriptionController::class, 'unsubscribe'])
     ->name('newsletter.unsubscribe');
 
 //Return Policy
