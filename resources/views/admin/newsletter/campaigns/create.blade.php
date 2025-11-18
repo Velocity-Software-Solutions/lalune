@@ -253,6 +253,7 @@
                 {{-- Submit --}}
                 <div class="pt-2 flex justify-end">
                     <button
+                    id="save_button"
                         type="submit"
                         class="inline-flex items-center justify-center px-4 py-2 rounded-full
                                text-sm font-semibold text-white bg-black hover:bg-gray-900 transition"
