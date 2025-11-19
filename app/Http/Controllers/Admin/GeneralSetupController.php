@@ -17,18 +17,24 @@ class GeneralSetupController extends Controller
             'background_image' => 'nullable|image|max:8048',
         ]);
 
-        // Get existing row or create a new instance (not saved yet)
-        $setup = GeneralSetup::firstOrNew(['key' => 'index_hero']);
+        // 1) EXPLICITLY fetch existing row
+        $setup = GeneralSetup::where('key', 'index_hero')->first();
 
-        // ✅ Only update content if it's actually present in the request
-        // This avoids wiping previous content with null when the field is left empty.
+        // 2) If none exists, create a new instance
+        if (! $setup) {
+            $setup = new GeneralSetup();
+            $setup->key = 'index_hero';
+        }
+
+        // 3) Only update content if the field is actually present
+        //    (so a missing field does NOT wipe existing content)
         if ($request->has('content')) {
             $setup->content = $request->input('content');
         }
 
-        // ✅ Handle background image upload
+        // 4) Background image: replace file, keep record
         if ($request->hasFile('background_image')) {
-            // remove old image if there is one
+            // delete old file from disk only
             if (!empty($setup->background_image)) {
                 Storage::disk('public')->delete($setup->background_image);
             }
@@ -37,7 +43,7 @@ class GeneralSetupController extends Controller
             $setup->background_image = $path;
         }
 
-        // ✅ Make sure we actually save the changes
+        // 5) Save changes to the *same* row (or new one if it didn't exist)
         $setup->save();
 
         return back()->with('status', 'Index hero setup updated successfully.');
@@ -51,7 +57,7 @@ class GeneralSetupController extends Controller
             if (!empty($setup->background_image)) {
                 Storage::disk('public')->delete($setup->background_image);
             }
-            $setup->delete();
+            $setup->delete(); // <- THIS is the only place we ever delete the row
         }
 
         return back()->with('status', 'Hero reset to default.');

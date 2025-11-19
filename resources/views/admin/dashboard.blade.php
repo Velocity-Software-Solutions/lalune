@@ -168,7 +168,11 @@
             </button>
 
             {{-- Reset button (only if row exists) --}}
-            @if($indexHero)
+
+          </div>
+        </div>
+      </form>
+                  @if($indexHero)
               <form
                 action="{{ route('admin.general.index-hero.reset') }}"
                 method="POST"
@@ -183,9 +187,6 @@
                 </button>
               </form>
             @endif
-          </div>
-        </div>
-      </form>
     </div>
   </div>
 </div>
