@@ -13,25 +13,23 @@ class GeneralSetupController extends Controller
     public function updateIndexHero(Request $request)
     {
         $request->validate([
-            'content' => 'nullable|string',
+            'content'          => 'nullable|string',
             'background_image' => 'nullable|image|max:8048',
         ]);
 
-        $setup = GeneralSetup::updateOrCreate(
-            ['key' => 'index_hero'],      // how to find the record
-            [                             // what to set/update
-                'content' => $request->input('content'),
-                // 'title' => $request->input('title'),
-                // 'subtitle' => $request->input('subtitle'),
-                // ...whatever fields belong to index_hero
-            ]
-        );
+        // Get existing row or create a new instance (not saved yet)
+        $setup = GeneralSetup::firstOrNew(['key' => 'index_hero']);
 
-        $setup->content = $request->input('content');
+        // ✅ Only update content if it's actually present in the request
+        // This avoids wiping previous content with null when the field is left empty.
+        if ($request->has('content')) {
+            $setup->content = $request->input('content');
+        }
 
+        // ✅ Handle background image upload
         if ($request->hasFile('background_image')) {
             // remove old image if there is one
-            if ($setup->background_image) {
+            if (!empty($setup->background_image)) {
                 Storage::disk('public')->delete($setup->background_image);
             }
 
@@ -39,16 +37,18 @@ class GeneralSetupController extends Controller
             $setup->background_image = $path;
         }
 
+        // ✅ Make sure we actually save the changes
         $setup->save();
 
         return back()->with('status', 'Index hero setup updated successfully.');
     }
+
     public function resetIndexHero()
     {
         $setup = GeneralSetup::where('key', 'index_hero')->first();
 
         if ($setup) {
-            if ($setup->background_image) {
+            if (!empty($setup->background_image)) {
                 Storage::disk('public')->delete($setup->background_image);
             }
             $setup->delete();
