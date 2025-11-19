@@ -6,29 +6,22 @@
 @endpush
 
 @section('content')
-@php
-    use Illuminate\Support\Facades\Storage;
+    @php
+        use Illuminate\Support\Facades\Storage;
 
-    // Fallbacks if nothing in DB
-    $defaultBg = asset('images/index-hero.jpg');
+        // Fallbacks if nothing in DB
+        $defaultBg = asset('images/index-hero.jpg');
 
-    // Decide background image
-    $heroBg = ($indexHero && $indexHero->background_image)
-        ? Storage::url($indexHero->background_image)
-        : $defaultBg;
-@endphp
+        // Decide background image
+        $heroBg = $indexHero && $indexHero->background_image ? Storage::url($indexHero->background_image) : $defaultBg;
+    @endphp
 
-<div class="h-[30vh] md:h-[60vh] mx-6 rounded-3xl 
+    <div class="h-[30vh] md:h-[60vh] mx-6 rounded-3xl 
              bg-cover bg-top bg-no-repeat md:bg-fixed"
-     style="background-image:url('{{ $heroBg }}');">
-    <!-- Optional overlay -->
-    <div
-        class="w-full h-full bg-black/30 flex flex-col justify-evenly rounded-3xl backdrop:blur-sm px-8 py-4 text-center">
-
-        @if($indexHero && $indexHero->content)
-            {{-- Content from editor --}}
-            {!! $indexHero->content !!}
-        @else
+        style="background-image:url('{{ $heroBg }}');">
+        <!-- Optional overlay -->
+        <div
+            class="w-full h-full bg-black/30 flex flex-col justify-evenly rounded-3xl backdrop:blur-sm px-8 py-4 text-center">
             {{-- Default fallback content --}}
             <div class="self-center">
                 <h1 class="text-2xl md:text-5xl font-bolder font-serif text-white/90">
@@ -40,21 +33,24 @@
                     <span style="font-family:'Dancing Script', cursive;">love &amp; care</span>
                 </h3>
             </div>
-
-            <!-- Promo Codes Section -->
-            <div class="space-y-2 text-white/85 text-xs md:text-base montserrat-regular self-center">
-                <p>
-                    Free Shipping on CAD 250+ with code
-                    <span class="text-white font-semibold">FREESHIP</span>
-                </p>
-                <div class="flex space-x-2 lg:space-x-6">
-                    {{-- Keep your commented lines here if needed --}}
-                    {{-- <p>Save 10% on CAD 300+ with code <span class="text-white font-semibold">THANKS10</span></p> --}}
+            @if ($indexHero && $indexHero->content)
+                {{-- Content from editor --}}
+                {!! $indexHero->content !!}
+            @else
+                <!-- Promo Codes Section -->
+                <div class="space-y-2 text-white/85 text-xs md:text-base montserrat-regular self-center">
+                    <p>
+                        Free Shipping on CAD 250+ with code
+                        <span class="text-white font-semibold">FREESHIP</span>
+                    </p>
+                    <div class="flex space-x-2 lg:space-x-6">
+                        {{-- Keep your commented lines here if needed --}}
+                        {{-- <p>Save 10% on CAD 300+ with code <span class="text-white font-semibold">THANKS10</span></p> --}}
+                    </div>
                 </div>
-            </div>
-        @endif
+            @endif
+        </div>
     </div>
-</div>
 
 
     @php
