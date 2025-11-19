@@ -1,6 +1,10 @@
 @extends('layouts.admin')
 @section('title','Dashboard')
 
+@push('head')
+    @vite(['resources/js/summernote.js'])
+@endpush
+
 @section('content')
 <div class="px-4 py-6 space-y-6 overflow-scroll custom-scrollbar scrollbar-hide">
 
@@ -31,6 +35,124 @@
       </p>
     </div>
   </div>
+
+{{-- ===== General Setup: Index Hero (single row) ===== --}}
+@php
+    $heroBg = ($indexHero && $indexHero->background_image)
+        ? \Illuminate\Support\Facades\Storage::url($indexHero->background_image)
+        : asset('images/index-hero.jpg');
+@endphp
+
+<div class="bg-white border border-gray-200 rounded-lg p-4">
+  <div class="flex items-start justify-between gap-4">
+    <div class="flex-1 space-y-3">
+      <div class="flex items-center justify-between gap-3">
+        <div>
+          <h3 class="text-base font-semibold text-gray-900">
+            Homepage Hero – General Setup
+          </h3>
+          <p class="text-xs text-gray-500">
+            This edits a <span class="font-medium">single</span> configuration row.
+            If none exists, it will be created automatically.
+          </p>
+        </div>
+
+        @if(session('status'))
+          <span class="inline-flex items-center rounded-full bg-green-50 px-3 py-1 text-xs font-medium text-green-700">
+            {{ session('status') }}
+          </span>
+        @endif
+      </div>
+
+      @if($errors->any())
+        <div class="rounded-md bg-red-50 p-3 text-xs text-red-700">
+          <ul class="list-disc list-inside space-y-1">
+            @foreach($errors->all() as $error)
+              <li>{{ $error }}</li>
+            @endforeach
+          </ul>
+        </div>
+      @endif
+
+      {{-- Save / update form (creates row if missing) --}}
+      <form action="{{ route('admin.general.index-hero.update') }}"
+            method="POST"
+            enctype="multipart/form-data"
+            class="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
+        @csrf
+
+        {{-- Editor --}}
+        <div class="lg:col-span-2 space-y-2">
+          <label class="block text-sm font-medium text-gray-700">
+            Hero content
+          </label>
+          <textarea
+            name="content"
+            class="summernote-editor w-full rounded-md border border-gray-300 focus:border-gray-400 focus:ring-1 focus:ring-gray-300"
+          >{{ old('content', $indexHero?->content) }}</textarea>
+          <p class="mt-1 text-xs text-gray-500">
+            If filled, this HTML replaces the default “Made in Canada / love &amp; care” block.
+          </p>
+        </div>
+
+        {{-- Background preview + upload --}}
+        <div class="space-y-3">
+          <div>
+            <label class="block text-sm font-medium text-gray-700">
+              Background image
+            </label>
+            <div class="mt-1 h-24 w-full rounded-lg border border-dashed border-gray-300 bg-gray-50 overflow-hidden">
+              <div class="w-full h-full bg-cover bg-center"
+                   style="background-image:url('{{ $heroBg }}');">
+              </div>
+            </div>
+            <p class="mt-1 text-xs text-gray-500">
+              If no image is saved, the default <code>images/index-hero.jpg</code> is used.
+            </p>
+          </div>
+
+          <div class="space-y-1">
+            <input
+              type="file"
+              name="background_image"
+              class="block w-full text-xs text-gray-700 file:mr-3 file:rounded-md file:border-0 file:bg-gray-900 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-white hover:file:bg-gray-800" />
+            @if($indexHero && $indexHero->background_image)
+              <p class="text-[11px] text-gray-500 break-all">
+                Current: <span class="font-mono">{{ $indexHero->background_image }}</span>
+              </p>
+            @endif
+          </div>
+
+          <div class="pt-2 flex items-center gap-2">
+            <button
+              type="submit"
+              class="inline-flex items-center justify-center rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-1">
+              Save changes
+            </button>
+
+            {{-- Reset button (only if row exists) --}}
+            @if($indexHero)
+              <form
+                action="{{ route('admin.general.index-hero.reset') }}"
+                method="POST"
+                onsubmit="return confirm('Reset hero to default? This will delete the saved setup.');"
+                class="inline-flex ml-2">
+                @csrf
+                @method('DELETE')
+                <button
+                  type="submit"
+                  class="inline-flex items-center justify-center rounded-md border border-red-200 bg-white px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-100 focus:ring-offset-1">
+                  Reset to default
+                </button>
+              </form>
+            @endif
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
 
   {{-- ===== Orders last 30 days (Chart) ===== --}}
   <div class="bg-white border border-gray-200 rounded-lg p-4">
@@ -164,17 +286,6 @@
             {{ $insights['new_customers_7d'] ?? 0 }}
           </span>
         </li>
-
-        {{-- Abandoned from browser storage (no server table) --}}
-        {{-- <li class="flex items-start justify-between"
-            x-data="abandonedWidget({ serverValue: @js($insights['abandoned_checkouts_7d'] ?? null) })"
-            x-init="init()">
-          <div>
-            <p class="font-medium text-gray-800">Abandoned checkouts</p>
-            <p class="text-gray-500 text-sm">Last 7 days</p>
-          </div>
-          <span class="text-xs px-2 py-1 bg-gray-100 rounded" x-text="count ?? '—'"></span>
-        </li> --}}
       </ul>
     </div>
   </div>
@@ -246,24 +357,6 @@ function pendingOrdersTable(initial = { orders: [] }) {
     go(n){ this.page = n; },
     prev(){ if(this.page>1) this.page--; },
     next(){ if(this.page<this.totalPages) this.page++; },
-  }
-}
-
-// Alpine: Abandoned checkouts from localStorage
-// Expects localStorage.setItem('abandoned_checkouts', JSON.stringify([{ ts: 1710000000000, cartSize: 3 }, ...]))
-function abandonedWidget({ serverValue = null } = {}) {
-  return {
-    count: serverValue, // null until computed
-    init() {
-      try {
-        const raw = localStorage.getItem('abandoned_checkouts') || '[]';
-        const arr = JSON.parse(raw);
-        const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-        this.count = arr.filter(e => Number(e?.ts) >= weekAgo).length;
-      } catch (e) {
-        this.count = serverValue ?? null;
-      }
-    }
   }
 }
 </script>

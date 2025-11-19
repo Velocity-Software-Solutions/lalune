@@ -10,6 +10,7 @@ use App\Http\Controllers\Admin\ProductController;
 use App\Http\Controllers\Admin\ShippingOptionController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\Admin\CollectionController;
+use App\Http\Controllers\Admin\GeneralSetupController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Admin\SummernoteController;
 use App\Http\Middleware\IsAdmin;
@@ -38,7 +39,12 @@ Route::middleware(['auth', IsAdmin::class])->group(function () {
 
     Route::post('/upload-summernote-image', [SummernoteController::class, 'store']);
     Route::delete('/delete-summernote-image', [SummernoteController::class, 'destroy']);
-    // routes/web.php or routes/admin.php
+
+
+    Route::post('/general/index-hero', [GeneralSetupController::class, 'updateIndexHero'])
+        ->name('general.index-hero.update');
+            Route::delete('/general/index-hero', [GeneralSetupController::class, 'resetIndexHero'])
+        ->name('general.index-hero.reset');
     Route::prefix('newsletter')
         ->name('newsletter.')
         ->group(function () {

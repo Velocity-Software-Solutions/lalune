@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\GeneralSetup;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use App\Models\Order;
@@ -95,6 +96,9 @@ public function index()
         'abandoned_checkouts_7d'  => null, // stays client-side via localStorage
     ];
 
-    return view('admin.dashboard', compact('kpis', 'ordersSeries', 'pendingOrders', 'insights'));
+    $indexHero = GeneralSetup::where('key', 'index_hero')->first();
+
+
+    return view('admin.dashboard', compact('kpis', 'ordersSeries', 'pendingOrders', 'insights','indexHero'));
 }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\GeneralSetup;
 use App\Models\Product;
 
 class StoreController extends Controller
@@ -30,9 +31,11 @@ class StoreController extends Controller
                 // Otherwise fall back to default name
                 return $p->category->name ?? 'Uncategorized';
             });
+                $indexHero = GeneralSetup::where('key', 'index_hero')->first();
+
 
             
-        return view('index', compact('products'));
+        return view('index', compact('products','indexHero'));
     }
 
     public function show($id)
