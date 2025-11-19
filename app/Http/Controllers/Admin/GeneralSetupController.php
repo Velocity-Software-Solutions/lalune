@@ -13,11 +13,19 @@ class GeneralSetupController extends Controller
     public function updateIndexHero(Request $request)
     {
         $request->validate([
-            'content'          => 'nullable|string',
+            'content' => 'nullable|string',
             'background_image' => 'nullable|image|max:8048',
         ]);
 
-        $setup = GeneralSetup::firstOrNew(['key' => 'index_hero']);
+        $setup = GeneralSetup::updateOrCreate(
+            ['key' => 'index_hero'],      // how to find the record
+            [                             // what to set/update
+                'content' => $request->input('content'),
+                // 'title' => $request->input('title'),
+                // 'subtitle' => $request->input('subtitle'),
+                // ...whatever fields belong to index_hero
+            ]
+        );
 
         $setup->content = $request->input('content');
 
@@ -35,7 +43,7 @@ class GeneralSetupController extends Controller
 
         return back()->with('status', 'Index hero setup updated successfully.');
     }
-        public function resetIndexHero()
+    public function resetIndexHero()
     {
         $setup = GeneralSetup::where('key', 'index_hero')->first();
 
