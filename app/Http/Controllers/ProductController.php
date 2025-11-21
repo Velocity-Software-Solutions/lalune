@@ -34,7 +34,7 @@ class ProductController extends Controller
     public function show($slug)
     {
         // First try by slug
-        $product = Product::where('slug', $slug)
+        $product = Product::where(['slug'=> $slug,'status' => 1])
             ->with(['images', 'colors', 'sizes', 'stock', 'approvedReviews'])
             ->first();
 
