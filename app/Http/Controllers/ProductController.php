@@ -33,14 +33,26 @@ class ProductController extends Controller
 
     public function show($slug)
     {
-        $product = Product::where('slug', $slug)->with(['images', 'colors', 'sizes', 'stock', 'approvedReviews'])->first();
-        if (!$product) {
-            $product = Product::with(['images', 'colors', 'sizes', 'stock', 'approvedReviews'])->find($slug);
-            if (!$product) {
-                abort(404);
+        // First try by slug
+        $product = Product::where('slug', $slug)
+            ->with(['images', 'colors', 'sizes', 'stock', 'approvedReviews'])
+            ->first();
+
+        // If not found, but $slug is numeric, try by ID and redirect
+        if (!$product && ctype_digit($slug)) {
+            $productById = Product::with(['images', 'colors', 'sizes', 'stock', 'approvedReviews'])
+                ->find($slug);
+
+            if ($productById && $productById->slug) {
+                // 301 redirect from /products/8 → /products/nef-005
+                return redirect()->route('products.show', $productById->slug, 301);
             }
         }
-        // Similar products
+
+        if (!$product) {
+            abort(404);
+        }
+
         $smiliarProducts = Product::where('category_id', $product->category_id)
             ->where('status', 1)
             ->whereKeyNot($product->getKey())
@@ -86,4 +98,5 @@ class ProductController extends Controller
 
         return view('products.show', compact('product', 'smiliarProducts', 'productTotalQty'));
     }
+
 }

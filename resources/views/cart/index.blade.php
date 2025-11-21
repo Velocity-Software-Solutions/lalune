@@ -1,5 +1,9 @@
 @extends('layouts.app')
 
+@push('head')
+<meta name="robots" content="noindex, follow">
+
+@endpush
 @section('content')
     <div class="px-4 py-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
         <h1 class="mb-6 text-3xl font-bold text-black">{{ __('cart.title') }}</h1>
