@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Mail\NewsletterConfirmMail;
+use App\Mail\NewsletterSubscribedMail;
 use App\Models\NewsletterSubscriber;
 use Illuminate\Http\Request;
 use Mail;
@@ -80,9 +81,9 @@ class NewsletterSubscriberController extends Controller
     }
 
     public function show(NewsletterSubscriber $subscriber)
-{
-    return view('admin.newsletter.subscribers.show', compact('subscriber'));
-}
+    {
+        return view('admin.newsletter.subscribers.show', compact('subscriber'));
+    }
 
 
     public function resendConfirm(NewsletterSubscriber $subscriber)
@@ -105,6 +106,43 @@ class NewsletterSubscriberController extends Controller
         return back()->with('success', 'Confirmation email resent to ' . $subscriber->email . '.');
     }
 
+    public function confirmAllPending()
+    {
+        $promoCode = 'WELCOME10';
+        $sentCount = 0;
+
+        NewsletterSubscriber::where('status', 'pending')
+            ->orderBy('id')
+            ->chunkById(100, function ($subscribers) use (&$sentCount, $promoCode) {
+                foreach ($subscribers as $subscriber) {
+
+                    // Build unsubscribe URL (adjust if you use tokens instead of raw email)
+                    $unsubscribeUrl = route('newsletter.unsubscribe', $subscriber->email);
+
+                    // Send the "subscribed" email
+                    Mail::mailer('noreply')
+                        ->to($subscriber->email)
+                        ->send(new NewsletterSubscribedMail(
+                            $promoCode,
+                            null,            // pass name or extra data if your mailable expects it
+                            $unsubscribeUrl
+                        ));
+
+                    // Update subscriber status → subscribed
+                    $subscriber->status = 'subscribed';
+                    $subscriber->confirmed_at = now();
+                    $subscriber->subscribed_at = $subscriber->subscribed_at ?? now();
+                    $subscriber->unsubscribed_at = null;
+                    $subscriber->confirmation_token = null;
+
+                    $subscriber->save();
+
+                    $sentCount++;
+                }
+            });
+
+        return back()->with('success', "Welcome email sent and status updated for {$sentCount} pending subscribers.");
+    }
     public function unsubscribe(NewsletterSubscriber $subscriber)
     {
         // If already unsubscribed, just return

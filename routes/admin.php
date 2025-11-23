@@ -43,7 +43,7 @@ Route::middleware(['auth', IsAdmin::class])->group(function () {
 
     Route::post('/general/index-hero', [GeneralSetupController::class, 'updateIndexHero'])
         ->name('general.index-hero.update');
-            Route::delete('/general/index-hero', [GeneralSetupController::class, 'resetIndexHero'])
+    Route::delete('/general/index-hero', [GeneralSetupController::class, 'resetIndexHero'])
         ->name('general.index-hero.reset');
     Route::prefix('newsletter')
         ->name('newsletter.')
@@ -52,6 +52,8 @@ Route::middleware(['auth', IsAdmin::class])->group(function () {
             Route::get('/subscribers/{subscriber}', [NewsletterSubscriberController::class, 'show'])->name('subscribers.show');
             Route::post('/subscribers/{subscriber}/resend-confirm', [NewsletterSubscriberController::class, 'resendConfirm'])
                 ->name('subscribers.resend-confirm');
+            Route::post('/subscribers/send-pending', [NewsletterSubscriberController::class, 'confirmAllPending'])
+                ->name('subscribers.send-pending');
 
             Route::post('/subscribers/{subscriber}/unsubscribe', [NewsletterSubscriberController::class, 'unsubscribe'])
                 ->name('subscribers.unsubscribe');

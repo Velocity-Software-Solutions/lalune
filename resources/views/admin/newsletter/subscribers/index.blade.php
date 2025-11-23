@@ -25,6 +25,7 @@
                         Add Subscriber
                     </button>
                 </form>
+
             </div>
 
             {{-- Filters --}}
@@ -87,6 +88,7 @@
                         class="px-3 py-2 rounded-lg text-sm font-semibold text-white bg-black hover:bg-gray-900 transition">
                         Filter
                     </button>
+
                 </div>
             </form>
 
@@ -190,7 +192,16 @@
                     </tbody>
                 </table>
             </div>
-
+            <div class="flex justify-end m-4">
+                <form method="POST" action="{{ route('admin.newsletter.subscribers.send-pending') }}"
+                    onsubmit="return confirm('Confirm Newsletter Subscription to all pending subscribers?');">
+                    @csrf
+                    <button type="submit"
+                        class="px-3 py-2 rounded-lg text-xs font-semibold text-white bg-black hover:bg-gray-900 transition">
+                        Confirm All
+                    </button>
+                </form>
+            </div>
             <div class="mt-4">
                 {{ $subscribers->links() }}
             </div>
