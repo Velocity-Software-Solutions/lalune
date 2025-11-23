@@ -233,17 +233,13 @@
                                 <table role="presentation" width="100%">
                                     <tr>
                                         <td align="left">
-                                            <div class="header-text-small">
-                                                LaLune by NE
+                                            <div>
+                                                <img src="{{ asset('images/logo-horizontal.jpg') }}"
+                                                    alt="Lalune By NE Logo" class="h-[80px] lg:h-[90px] xl:h-[100px]"
+                                                    height="80px">
                                             </div>
                                             <div class="header-title">
                                                 Newsletter
-                                            </div>
-                                        </td>
-                                        <td align="right">
-                                            <div class="header-meta">
-                                                {{ config('mail.from.address') }}<br>
-                                                To: {{ $subscriber->email }}
                                             </div>
                                         </td>
                                     </tr>
@@ -254,21 +250,6 @@
                         {{-- Content --}}
                         <tr>
                             <td class="content">
-                                {{-- Subject --}}
-                                <div class="subject-label">Subject</div>
-                                <div class="subject-line">
-                                    {{ $campaign->subject }}
-                                </div>
-
-                                {{-- Optional greeting --}}
-                                {{-- You can remove this if your body already includes one --}}
-                                <div style="margin-bottom: 12px; font-size:14px; color:#4b5563;">
-                                    @php
-                                        $email = $subscriber->email;
-                                    @endphp
-                                    Hello,
-                                </div>
-
                                 {{-- Body (Summernote HTML) --}}
                                 <div class="body-html">
                                     {!! $campaign->body !!}
