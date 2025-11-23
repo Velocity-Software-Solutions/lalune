@@ -1,5 +1,11 @@
 @extends('layouts.app')
 
+@section('title',  $product->name)
+
+@push('head')
+    <meta name="description" content="{{ Str::limit(strip_tags($product->description), 150) }}">
+@endpush
+
 @section('content')
     @php
         $colorHexById = $product->colors->pluck('color_code', 'id')->map(fn($v) => strtoupper($v));

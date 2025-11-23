@@ -11,37 +11,63 @@ use Mail;
 
 class NewsletterSubscriptionController extends Controller
 {
-    public function store(Request $request)
-    {
-        $data = $request->validate([
-            'email' => ['required', 'email:rfc', 'max:255'],
-        ]);
+public function store(Request $request)
+{
+    $data = $request->validate([
+        'email' => ['required', 'email:rfc', 'max:255'],
+    ]);
 
-        $token = Str::random(40);
+    // Check if this email already exists
+    $existing = NewsletterSubscriber::where('email', $data['email'])->first();
 
-        // Create or refresh an existing subscriber
-        $subscriber = NewsletterSubscriber::updateOrCreate(
-            ['email' => $data['email']],
-            [
-                'source' => 'popup',
-                'status' => 'pending',
-                'confirmation_token' => $token,
-                'confirmed_at' => null,
-                'subscribed_at' => null, // will be set on confirm
-                'unsubscribed_at' => null,
-            ]
-        );
-
-        // Send confirmation email
-        Mail::mailer('noreply')
-            ->to($subscriber->email)
-            ->send(new NewsletterConfirmMail($subscriber));
-
-        return back()->with(
-            'success',
-            'Thank you for subscribing! Please check your email to confirm your subscription.'
-        );
+    // If already subscribed → show error
+    if ($existing && $existing->status === 'subscribed') {
+        return back()
+            ->withErrors([
+                'email' => 'This email is already subscribed to our newsletter.',
+            ])
+            ->withInput();
     }
+
+    // If not existing → create new
+    if (! $existing) {
+        $subscriber = NewsletterSubscriber::create([
+            'email'            => $data['email'],
+            'source'           => 'popup',
+            'status'           => 'subscribed',
+            'confirmation_token' => null,
+            'confirmed_at'     => now(),
+            'subscribed_at'    => now(),
+            'unsubscribed_at'  => null,
+        ]);
+    } else {
+        // If it exists but is NOT subscribed (e.g. unsubscribed/pending), re-subscribe
+        $existing->fill([
+            'source'           => 'popup',
+            'status'           => 'subscribed',
+            'confirmation_token' => null,
+            'confirmed_at'     => now(),
+            'subscribed_at'    => $existing->subscribed_at ?? now(),
+            'unsubscribed_at'  => null,
+        ]);
+        $existing->save();
+
+        $subscriber = $existing;
+    }
+
+    $unsubscribeUrl = route('newsletter.unsubscribe', $subscriber->email); // adjust if you use token
+    $promoCode = 'WELCOME10';
+
+    // Send welcome / subscribed email
+    Mail::mailer('noreply')
+        ->to($subscriber->email)
+        ->send(new NewsletterSubscribedMail($promoCode, null, $unsubscribeUrl));
+
+    return back()->with(
+        'success',
+        'Thank you for subscribing! Enjoy a 10% discount.'
+    );
+}
 
     public function confirm(string $token)
     {
