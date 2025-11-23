@@ -4,23 +4,26 @@
 
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <title>Welcome to our newsletter | {{ $brandName }}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
-<body style="margin:0; padding:0; background-color:#f5f5f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#f5f5f5; padding:24px 0;">
+
+<body
+    style="margin:0; padding:0; background-color:#f5f5f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation"
+        style="background-color:#f5f5f5; padding:24px 0;">
         <tr>
             <td align="center">
                 <table width="100%" cellpadding="0" cellspacing="0" role="presentation"
-                       style="max-width:560px; background-color:#ffffff; border-radius:12px; overflow:hidden; border:1px solid #e5e7eb;">
+                    style="max-width:560px; background-color:#ffffff; border-radius:12px; overflow:hidden; border:1px solid #e5e7eb;">
                     <!-- Header -->
                     <tr>
                         <td style="padding:22px 26px; background-color:#000000; color:#f9fafb; text-align:left;">
-                            <div style="font-size:20px; font-weight:600; letter-spacing:0.18em; text-transform:uppercase;">
-                                {{ $brandName }}
-                            </div>
+                            <img src="{{ asset('images/logo-horizontal.jpg') }}" alt="Lalune By NE Logo"
+                                class="h-[80px] lg:h-[90px] xl:h-[100px]">
                             <div style="margin-top:6px; font-size:12px; opacity:0.8;">
                                 You’re now subscribed
                             </div>
@@ -36,7 +39,8 @@
 
                             <p style="margin:0 0 14px; font-size:14px; color:#333333; line-height:1.6;">
                                 You’re officially part of the <strong>{{ $brandName }}</strong> list.
-                                We’ll send you exclusive updates, early looks, and special promo codes from time to time.
+                                We’ll send you exclusive updates, early looks, and special promo codes from time to
+                                time.
                             </p>
 
                             @isset($promoCode)
@@ -44,7 +48,8 @@
                                     Here’s a little something to start:
                                 </p>
 
-                                <p style="margin:0 0 18px; font-size:18px; font-weight:700; letter-spacing:0.16em;
+                                <p
+                                    style="margin:0 0 18px; font-size:18px; font-weight:700; letter-spacing:0.16em;
                                           color:#000000; text-align:center; text-transform:uppercase;">
                                     {{ $promoCode }}
                                 </p>
@@ -63,7 +68,7 @@
                                     <tr>
                                         <td align="center">
                                             <a href="{{ $shopUrl }}"
-                                               style="display:inline-block; padding:10px 26px; font-size:13px; font-weight:600;
+                                                style="display:inline-block; padding:10px 26px; font-size:13px; font-weight:600;
                                                       color:#ffffff; text-decoration:none; border-radius:9999px;
                                                       background-color:#000000; border:1px solid #000000;">
                                                 Browse LaLune
@@ -88,7 +93,7 @@
 
                             @isset($unsubscribeUrl)
                                 <p style="margin:4px 0 0; font-size:11px; color:#9ca3af;">
-                                    Prefer not to receive these? 
+                                    Prefer not to receive these?
                                     <a href="{{ $unsubscribeUrl }}" style="color:#4b5563; text-decoration:underline;">
                                         Unsubscribe here
                                     </a>.
@@ -101,4 +106,5 @@
         </tr>
     </table>
 </body>
+
 </html>
