@@ -232,7 +232,7 @@
                                 <table role="presentation" width="100%">
                                     <tr>
                                         <td align="center">
-                                            <div class="flex justify-center">
+                                            <div style="display:flex; justify-content:center;">
                                                 <img src="{{ asset('images/logo-horizontal.jpg') }}"
                                                     alt="Lalune By NE Logo" class="h-[80px] lg:h-[90px] xl:h-[100px]"
                                                     height="80px">
