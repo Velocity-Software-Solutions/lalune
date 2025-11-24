@@ -231,14 +231,11 @@
                             <td class="header">
                                 <table role="presentation" width="100%">
                                     <tr>
-                                        <td align="left">
+                                        <td align="center">
                                             <div>
                                                 <img src="{{ asset('images/logo-horizontal.jpg') }}"
                                                     alt="Lalune By NE Logo" class="h-[80px] lg:h-[90px] xl:h-[100px]"
                                                     height="80px">
-                                            </div>
-                                            <div class="header-title">
-                                                Newsletter
                                             </div>
                                         </td>
                                     </tr>
