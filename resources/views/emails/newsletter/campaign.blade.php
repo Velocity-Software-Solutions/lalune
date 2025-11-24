@@ -231,11 +231,10 @@
                             <td class="header">
                                 <table role="presentation" width="100%">
                                     <tr>
-                                        <td align="center">
-                                            <div style="display:flex; justify-content:center;">
-                                                <img src="{{ asset('images/logo-horizontal.jpg') }}"
-                                                    alt="Lalune By NE Logo" class="h-[80px] lg:h-[90px] xl:h-[100px]"
-                                                    height="80px">
+                                        <td
+                                            style="padding:10px 16px; background-color:#000000; color:#f9fafb; text-align:center;">
+                                            <img src="{{ asset('images/logo-horizontal.jpg') }}" alt="Lalune By NE Logo"
+                                                height="80" style="display:block; margin:0 auto 6px auto;">
                                             </div>
                                         </td>
                                     </tr>

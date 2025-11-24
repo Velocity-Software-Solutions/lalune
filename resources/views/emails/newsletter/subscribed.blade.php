@@ -21,14 +21,15 @@
                     style="max-width:560px; background-color:#ffffff; border-radius:12px; overflow:hidden; border:1px solid #e5e7eb;">
                     <!-- Header -->
                     <tr>
-                        <td style="padding:10px 16px; background-color:#000000; color:#f9fafb;display:flex; justify-content: center;">
-                                <img src="{{ asset('images/logo-horizontal.jpg') }}" alt="Lalune By NE Logo"
-                                    class="h-[80px] lg:h-[90px] xl:h-[100px]" height="80px">
-                            <div style="margin-top:6px; font-size:12px; opacity:0.8; text-align: center;">
+                        <td style="padding:10px 16px; background-color:#000000; color:#f9fafb; text-align:center;">
+                            <img src="{{ asset('images/logo-horizontal.jpg') }}" alt="Lalune By NE Logo" height="80"
+                                style="display:block; margin:0 auto 6px auto;">
+                            <div style="font-size:12px; opacity:0.8;">
                                 You’re now subscribed
                             </div>
                         </td>
                     </tr>
+
 
                     <!-- Body -->
                     <tr>
