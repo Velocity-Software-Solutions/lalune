@@ -6,6 +6,43 @@
 @endpush
 
 @section('content')
+<style>
+        h1 {
+            font-size: 2.25rem;
+            /* 36px */
+            font-weight: 700;
+        }
+
+        h2 {
+            font-size: 1.875rem;
+            /* 30px */
+            font-weight: 600;
+        }
+
+        h3 {
+            font-size: 1.5rem;
+            /* 24px */
+            font-weight: 600;
+        }
+
+        h4 {
+            font-size: 1.25rem;
+            /* 20px */
+            font-weight: 500;
+        }
+
+        h5 {
+            font-size: 1rem;
+            /* 16px */
+            font-weight: 500;
+        }
+
+        h6 {
+            font-size: 0.875rem;
+            /* 14px */
+            font-weight: 500;
+        }
+    </style>
 <div class="max-w-6xl mx-auto px-4 py-8">
 
     {{-- Flash --}}
