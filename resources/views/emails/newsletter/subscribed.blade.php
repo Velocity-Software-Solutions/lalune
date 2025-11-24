@@ -22,7 +22,7 @@
                     <!-- Header -->
                     <tr>
                         <td style="padding:10px 16px; background-color:#000000; color:#f9fafb;">
-                            <div class="flex justify-center">
+                            <div style="display:flex; justify-content:center;">
                                 <img src="{{ asset('images/logo-horizontal.jpg') }}" alt="Lalune By NE Logo"
                                     class="h-[80px] lg:h-[90px] xl:h-[100px]" height="80px">
                             </div>
