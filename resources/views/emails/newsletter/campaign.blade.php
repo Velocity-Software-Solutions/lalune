@@ -246,7 +246,7 @@
                         <tr>
                             <td class="content" align="center"
                                 style="padding:24px 24px 12px 24px; color:#111827; font-size:14px; line-height:1.6;">
-                                <table role="presentation" width="100%" style="border-collapse:collapse;">
+                                <table class="main" width="100%">
                                     <tr>
                                         <td align="center"
                                             style="text-align:center; font-size:14px; line-height:1.6; color:#111827;">
