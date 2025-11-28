@@ -17,6 +17,10 @@
                 font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
             }
 
+            a{
+                color: black;
+            }
+
             table {
                 border-spacing: 0;
                 border-collapse: collapse;
