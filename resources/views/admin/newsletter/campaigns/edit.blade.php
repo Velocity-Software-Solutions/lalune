@@ -376,6 +376,7 @@
         // ----- Audience: show/hide specific subscribers box -----
         const segmentRadios = document.querySelectorAll('input[name="segment"]');
         const customBox = document.getElementById('custom-subscribers-box');
+
         function refreshCustomBox() {
             if (!customBox) return;
             const selected = document.querySelector('input[name="segment"]:checked');
@@ -421,18 +422,23 @@
             bodyPreview.innerHTML = html || defaultBody;
         }
 
-        // Summernote change listener (summernote.js already initializes the editor)
-        if (typeof $ !== 'undefined' && $.fn && $.fn.summernote) {
-            $('.summernote-editor').on('summernote.change', function (we, contents) {
-                updateBodyPreview(contents);
-            });
-
-            // Initial sync from editor content
-            const initialContents = $('.summernote-editor').summernote('code');
-            updateBodyPreview(initialContents);
+        // Initial preview from the textarea value (no summernote() call!)
+        const textarea = document.querySelector('.summernote-editor');
+        if (textarea) {
+            updateBodyPreview(textarea.value);
         } else {
             updateBodyPreview(null);
         }
+
+        // Attach change listener *after* Summernote is initialized by your global JS
+        if (typeof $ !== 'undefined' && $.fn && $.fn.summernote) {
+            setTimeout(function () {
+                $('.summernote-editor').on('summernote.change', function (we, contents) {
+                    updateBodyPreview(contents);
+                });
+            }, 200); // small delay to ensure editor is ready
+        }
     });
 </script>
+
 @endsection
