@@ -101,6 +101,9 @@
                 font-size: 14px;
                 line-height: 1.6;
                 color: #111827;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
             }
 
             .body-html a {
