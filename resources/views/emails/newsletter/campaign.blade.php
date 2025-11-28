@@ -235,7 +235,6 @@
                                             style="padding:10px 16px; background-color:#000000; color:#f9fafb; text-align:center;">
                                             <img src="{{ asset('images/logo-horizontal.jpg') }}" alt="Lalune By NE Logo"
                                                 height="80" style="display:block; margin:0 auto 6px auto;">
-                                            </div>
                                         </td>
                                     </tr>
                                 </table>
