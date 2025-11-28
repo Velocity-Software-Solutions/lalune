@@ -101,9 +101,6 @@
                 font-size: 14px;
                 line-height: 1.6;
                 color: #111827;
-                display: flex;
-                flex-direction: column;
-                justify-content: center;
             }
 
             .body-html a {
@@ -247,13 +244,19 @@
 
                         {{-- Content --}}
                         <tr>
-                            <td class="content">
-                                {{-- Body (Summernote HTML) --}}
-                                <div class="body-html">
-                                    {!! $campaign->body !!}
-                                </div>
+                            <td class="content" align="center"
+                                style="padding:24px 24px 12px 24px; color:#111827; font-size:14px; line-height:1.6;">
+                                <table role="presentation" width="100%" style="border-collapse:collapse;">
+                                    <tr>
+                                        <td align="center"
+                                            style="text-align:center; font-size:14px; line-height:1.6; color:#111827;">
+                                            {!! $campaign->body !!}
+                                        </td>
+                                    </tr>
+                                </table>
                             </td>
                         </tr>
+
 
                         {{-- Footer --}}
                         <tr>
