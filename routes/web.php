@@ -35,7 +35,7 @@ Route::post('contact', [ContactController::class, 'submit'])->name('contact.subm
 
 // Newsletter routes
 Route::post('/newsletter/subscribe', [NewsletterSubscriptionController::class, 'store'])
-    ->name('newsletter.subscribe');
+    ->name('newsletter.subscribe')->middleware('throttle:5,1');;
 Route::get('/newsletter/confirm/{token}', [NewsletterSubscriptionController::class, 'confirm'])
     ->name('newsletter.confirm');
 Route::get('/newsletter/unsubscribe/{email}', [NewsletterSubscriptionController::class, 'unsubscribe'])
@@ -96,17 +96,6 @@ Route::post('/order/confirmation/rate', [CheckoutController::class, 'rate'])->na
 
 // Download receipt
 Route::get('/checkout/{order}/receipt', [CheckoutController::class, 'downloadReceipt'])->name('checkout.receipt');
-
-/*
-|--------------------------------------------------------------------------
-| Admin & Authenticated Routes
-|--------------------------------------------------------------------------
-*/
-
-// Admin dashboard (only for authenticated users)
-Route::get('/dashboard', function () {
-    return view('admin.dashboard');
-})->middleware(['auth'])->name('dashboard');
 
 /*
 |--------------------------------------------------------------------------

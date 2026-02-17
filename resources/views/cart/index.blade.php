@@ -275,7 +275,7 @@
                                 <span class="font-medium text-black">CAD {{ $money($itemsSubtotal) }}</span>
                             </div>
 
-                            <div class="flex items-center justify-between">
+                            {{-- <div class="flex items-center justify-between">
                                 <span class="text-gray-600">Shipping</span>
                                 @if ($hasFreeShipping && $shippingBefore > 0)
                                     <span class="font-medium">
@@ -286,7 +286,7 @@
                                 @else
                                     <span class="font-medium text-black">CAD {{ $money($shippingAfter) }}</span>
                                 @endif
-                            </div>
+                            </div> --}}
 
                             @if ($discountAmount > 0)
                                 <div class="flex items-center justify-between">

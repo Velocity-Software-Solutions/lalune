@@ -23,7 +23,7 @@ class ProductController extends Controller
         }
 
         $products = Product::where(['category_id' => $categoryId, 'status' => 1])
-            ->with('images')
+            ->with('images','prices','sizes','approvedReviews:id,product_id,rating',)
             ->latest()
             ->get();
 

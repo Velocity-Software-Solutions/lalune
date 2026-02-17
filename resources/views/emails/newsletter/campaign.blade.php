@@ -18,7 +18,7 @@
             }
 
             a{
-                color: black;
+                color: black !important;
             }
 
             table {

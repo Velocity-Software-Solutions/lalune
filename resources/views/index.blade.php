@@ -6,7 +6,7 @@
 @endpush
 
 @section('content')
-<style>
+    <style>
         h1 {
             font-size: 2.25rem;
             /* 36px */
@@ -62,7 +62,7 @@
             {{-- Default fallback content --}}
             <div class="self-center">
                 <h1 class="text-2xl md:text-5xl font-bolder font-serif text-white/90">
-                    Made in Canada
+                    Designed in Canada
                 </h1>
                 <br>
                 <h3 class="text-xl md:text-4xl font-bold font-serif text-white/90">
@@ -115,6 +115,30 @@
                         // ⭐️ NEW: rating summary
                         'avg_rating' => $approved->count() ? round($approved->avg('rating') * 2) / 2 : 0,
                         'reviews_count' => $approved->count(),
+                        'prices_min_data' => $p->relationLoaded('prices')
+                            ? collect($p->prices)
+                                ->map(function ($row) {
+                                    $price = (float) ($row->price ?? 0);
+                                    $disc = (float) ($row->discounted_price ?? 0);
+
+                                    // effective price used for "min"
+                                    $effective = $disc > 0 ? $disc : ($price > 0 ? $price : null);
+
+                                    if ($effective === null) {
+                                        return null;
+                                    }
+
+                                    return [
+                                        'effective' => $effective, // what we show
+                                        'original' => $price > 0 ? $price : null, // for strikethrough
+                                        'is_discount' => $disc > 0 && $price > 0 && $disc < $price,
+                                    ];
+                                })
+                                ->filter() // remove nulls
+                                ->sortBy('effective')
+                                ->first()
+                            : null,
+                        'prices_min' => null, // (optional) remove if you want, or keep for backward compat
                     ];
                 });
             })
@@ -332,23 +356,57 @@
                                         </p>
 
                                         <div class="flex items-center justify-between mt-3">
-                                            <template x-if="item.discount_price">
+                                            <!-- If prices relation has any -> show the lowest effective price, and if it's discounted show strike-through -->
+                                            <template
+                                                x-if="item.prices_min_data && Number(item.prices_min_data.effective) > 0">
                                                 <div class="flex items-center gap-2 sm:gap-3">
-                                                    <span class="text-lg sm:text-xl font-semibold text-red-600"
-                                                        x-text="`CAD ${formatPrice(item.discount_price)}`"></span>
-                                                    <span class="hidden sm:inline text-gray-500 line-through"
-                                                        x-text="`CAD ${formatPrice(item.price)}`"></span>
-                                                    <span
-                                                        class="text-[10px] px-1.5 py-0.5 font-bold text-white bg-green-600 rounded-md"
-                                                        x-text="`-${discountPercent(item)}%`"></span>
+                                                    <span class="text-lg sm:text-xl font-semibold"
+                                                        :class="item.prices_min_data.is_discount ? 'text-red-600' : 'text-black'"
+                                                        x-text="`CAD ${formatPrice(item.prices_min_data.effective)}`">
+                                                    </span>
+
+                                                    <template
+                                                        x-if="item.prices_min_data.is_discount && item.prices_min_data.original">
+                                                        <span class="hidden sm:inline text-gray-500 line-through"
+                                                            x-text="`CAD ${formatPrice(item.prices_min_data.original)}`"></span>
+                                                    </template>
+
+                                                    <template
+                                                        x-if="item.prices_min_data.is_discount && item.prices_min_data.original">
+                                                        <span
+                                                            class="text-[10px] px-1.5 py-0.5 font-bold text-white bg-green-600 rounded-md"
+                                                            x-text="`-${Math.round(((item.prices_min_data.original - item.prices_min_data.effective) / item.prices_min_data.original) * 100)}%`">
+                                                        </span>
+                                                    </template>
                                                 </div>
                                             </template>
-                                            <template x-if="!item.discount_price">
-                                                <span class="text-lg sm:text-2xl font-semibold text-black"
-                                                    x-text="`CAD ${formatPrice(item.price)}`"></span>
+
+                                            <!-- Otherwise fallback to product discount_price then price -->
+                                            <template
+                                                x-if="!(item.prices_min_data && Number(item.prices_min_data.effective) > 0)">
+                                                <div>
+                                                    <template
+                                                        x-if="item.discount_price && Number(item.discount_price) > 0">
+                                                        <div class="flex items-center gap-2 sm:gap-3">
+                                                            <span class="text-lg sm:text-xl font-semibold text-red-600"
+                                                                x-text="`CAD ${formatPrice(item.discount_price)}`"></span>
+                                                            <span class="hidden sm:inline text-gray-500 line-through"
+                                                                x-text="`CAD ${formatPrice(item.price)}`"></span>
+                                                            <span
+                                                                class="text-[10px] px-1.5 py-0.5 font-bold text-white bg-green-600 rounded-md"
+                                                                x-text="`-${discountPercent(item)}%`"></span>
+                                                        </div>
+                                                    </template>
+
+                                                    <template
+                                                        x-if="!(item.discount_price && Number(item.discount_price) > 0)">
+                                                        <span class="text-lg sm:text-2xl font-semibold text-black"
+                                                            x-text="`CAD ${formatPrice(item.price)}`"></span>
+                                                    </template>
+                                                </div>
                                             </template>
                                         </div>
-
+                                        <p class="text-sm text-gray-500">Price may vary by selected options.</p>
                                     </div>
                                 </div>
 
@@ -413,25 +471,36 @@
                 and members-only promo codes.
             </p>
 
-            <form method="POST" action="{{ route('newsletter.subscribe') }}" class="space-y-2">
+            <form method="POST" action="{{ route('newsletter.subscribe') }}" class="space-y-2" x-data="{ hpTime: Date.now() }">
                 @csrf
+
+                {{-- ✅ Honeypot (bots often fill it) --}}
+                <div class="hidden" aria-hidden="true">
+                    <label>Leave this field empty</label>
+                    <input type="text" name="website" tabindex="-1" autocomplete="off">
+                </div>
+
+                {{-- ✅ Time trap (set on render, validated on server) --}}
+                <input type="hidden" name="hp_time" :value="hpTime">
+                <input type="hidden" name="source" value="popup">
                 <input type="email" name="email" x-model="email" required placeholder="Enter your email"
                     class="w-full px-3 py-2 rounded-xl text-xs sm:text-sm
-                       bg-white/10 border border-white/40
-                       placeholder-white/70
-                       focus:outline-none focus:ring-2 focus:ring-white/70
-                       focus:border-transparent" />
+               bg-white/10 border border-white/40
+               placeholder-white/70
+               focus:outline-none focus:ring-2 focus:ring-white/70
+               focus:border-transparent" />
 
                 <button type="submit"
                     class="w-full px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold
-                       bg-gradient-to-r from-black via-neutral-700 to-black
-                       bg-[length:200%_100%] bg-left hover:bg-right
-                       transition-all duration-500
-                       shadow-lg shadow-black/40"
+               bg-gradient-to-r from-black via-neutral-700 to-black
+               bg-[length:200%_100%] bg-left hover:bg-right
+               transition-all duration-500
+               shadow-lg shadow-black/40"
                     @click="if(email){ localStorage.setItem('email_popup_closed','1'); }">
                     Subscribe now
                 </button>
             </form>
+
 
             <p class="mt-2 text-[10px] text-white/60 leading-snug">
                 By subscribing, you agree to receive marketing emails from
@@ -467,6 +536,17 @@
 
                 justFiltered: false,
 
+                displayPrice(p) {
+                    const pm = p.prices_min_data?.effective ? Number(p.prices_min_data.effective) : 0;
+                    if (pm > 0) return pm;
+
+                    const dp = Number(p.discount_price || 0);
+                    if (dp > 0) return dp;
+
+                    return Number(p.price || 0);
+                },
+
+
                 // computed
                 get filtered() {
                     let list = [...this.products];
@@ -492,14 +572,17 @@
 
                     switch (this.sort) {
                         case 'price_low':
-                            list.sort((a, b) => (a.discount_price ?? a.price) - (b.discount_price ?? b.price));
+                            list.sort((a, b) => this.displayPrice(a) - this.displayPrice(b));
                             break;
                         case 'price_high':
-                            list.sort((a, b) => (b.discount_price ?? b.price) - (a.discount_price ?? a.price));
+                            list.sort((a, b) => this.displayPrice(b) - this.displayPrice(a));
                             break;
                         case 'discount':
-                            const disc = p => (p.price > 0 && p.discount_price != null) ? (p.price - p.discount_price) /
-                                p.price : 0;
+                            const disc = p => {
+                                const base = Number(p.price || 0);
+                                const shown = this.displayPrice(p);
+                                return (base > 0 && shown > 0 && shown < base) ? (base - shown) / base : 0;
+                            };
                             list.sort((a, b) => disc(b) - disc(a));
                             break;
                         case 'latest':

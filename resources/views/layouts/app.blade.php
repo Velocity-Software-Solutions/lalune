@@ -99,7 +99,8 @@
                 </div>
 
                 @auth
-                    <a href="{{ route('dashboard') }}" class="hover:text-gray-200">{{ __('messages.nav_dashboard') }}</a>
+                    <a href="{{ route('admin.dashboard') }}"
+                        class="hover:text-gray-200">{{ __('messages.nav_dashboard') }}</a>
                     <form action="{{ route('logout') }}" method="POST" class="inline">
                         @csrf
                         <button type="submit" class="hover:text-gray-200">{{ __('messages.nav_logout') }}</button>
@@ -186,7 +187,7 @@
                         x-transition:enter-start="-translate-y-6 opacity-0"
                         x-transition:enter-end="translate-y-0 opacity-100" :style="stagger(5)">
                         <div class="grid">
-                            <a href="{{ route('dashboard') }}" @click="mobileOpen=false"
+                            <a href="{{ route('admin.dashboard') }}" @click="mobileOpen=false"
                                 class="py-2 text-lg hover:text-white/90">{{ __('messages.nav_dashboard') }}</a>
                             <form action="{{ route('logout') }}" method="POST" class="py-2">
                                 @csrf
@@ -236,6 +237,13 @@
                     <form method="POST" action="{{ route('newsletter.subscribe') }}"
                         class="mt-3 flex flex-col sm:flex-row gap-2 sm:gap-3">
                         @csrf
+                        <div class="hidden" aria-hidden="true">
+                            <label>Leave this field empty</label>
+                            <input type="text" name="website" tabindex="-1" autocomplete="off">
+                        </div>
+
+                        <input type="hidden" name="hp_time" :value="hpTime">
+                        <input type="hidden" name="source" value="footer">
                         <input type="email" name="email" required placeholder="Enter your email"
                             class="w-full sm:w-64 px-3 py-2 rounded-xl text-xs sm:text-sm
                                border border-gray-300 bg-white

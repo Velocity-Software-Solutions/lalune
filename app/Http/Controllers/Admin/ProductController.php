@@ -29,255 +29,294 @@ class ProductController extends Controller
         return view('admin.products.create', compact('categories', 'collections'));
     }
 
-    public function store(Request $request)
-    {
-        $rules = [
-            'name' => 'required|string|max:255',
-            'slug' => 'nullable|string', // you’ll unique-ify after generating
-            'sku' => 'required|string|unique:products,sku',
-            'description' => 'nullable|string',
-            'description_ar' => 'nullable|string',
-            'price' => 'required|numeric|min:0',
-            'discount_price' => 'nullable|numeric|min:0',
+ public function store(Request $request)
+{
+    $rules = [
+        'name' => 'required|string|max:255',
+        'slug' => 'nullable|string',
+        'sku' => 'required|string|unique:products,sku',
+        'description' => 'nullable|string',
+        'description_ar' => 'nullable|string',
+        'price' => 'required|numeric|min:0',
+        'discount_price' => 'nullable|numeric|min:0',
 
-            // If you submit a matrix, product-level qty is optional
-            'stock_quantity' => 'required_without:stock_matrix|integer|min:0',
-            'status' => 'sometimes|boolean',
-            'category_id' => 'required|exists:categories,id',
-            'collection_id' => 'nullable|exists:collections,id',
+        // If you submit a matrix, product-level qty is optional
+        'stock_quantity' => 'required_without:stock_matrix|integer|min:0',
+        'status' => 'sometimes|boolean',
+        'category_id' => 'required|exists:categories,id',
+        'collection_id' => 'nullable|exists:collections,id',
 
-            // sizes
-            'sizes' => 'sometimes|array',
-            'sizes.*' => 'string|max:50',
+        // sizes
+        'sizes' => 'sometimes|array',
+        'sizes.*' => 'string|max:50',
 
-            // colors (master list for product)
-            'colors' => 'sometimes|array',
-            'colors.*.name' => 'required_with:colors|string|max:50',
-            'colors.*.color_code' => ['nullable', 'regex:/^#([0-9A-Fa-f]{6})$/'],
-            'colors.*.hex' => ['nullable', 'regex:/^#([0-9A-Fa-f]{6})$/'],
+        // colors
+        'colors' => 'sometimes|array',
+        'colors.*.name' => 'required_with:colors|string|max:50',
+        'colors.*.color_code' => ['nullable', 'regex:/^#([0-9A-Fa-f]{6})$/'],
+        'colors.*.hex' => ['nullable', 'regex:/^#([0-9A-Fa-f]{6})$/'],
 
-            // images
-            'images' => 'sometimes|array',
-            'images.*' => 'nullable|image|max:4096', // 4 MB
-            'image_color_codes' => 'sometimes|array',
-            'image_color_codes.*' => ['nullable', 'regex:/^#([0-9A-Fa-f]{6})$/'],
-            'image_color_hexes' => 'sometimes|array',
-            'image_color_hexes.*' => ['nullable', 'regex:/^#([0-9A-Fa-f]{6})$/'],
+        // images
+        'images' => 'sometimes|array',
+        'images.*' => 'nullable|image|max:4096',
+        'image_color_codes' => 'sometimes|array',
+        'image_color_codes.*' => ['nullable', 'regex:/^#([0-9A-Fa-f]{6})$/'],
+        'image_color_hexes' => 'sometimes|array',
+        'image_color_hexes.*' => ['nullable', 'regex:/^#([0-9A-Fa-f]{6})$/'],
 
-            // quantity matrix: stock_matrix[colorIndex|na][sizeIndex|na] = int
-            'stock_matrix' => 'sometimes|array',
-            'stock_matrix.*' => 'array',
-            'stock_matrix.*.*' => 'integer|min:0',
-        ];
+        // stock matrix
+        'stock_matrix' => 'sometimes|array',
+        'stock_matrix.*' => 'array',
+        'stock_matrix.*.*' => 'integer|min:0',
 
-        $messages = [
-            // Basics
-            'name.required' => 'Please enter a product name.',
-            'name.max' => 'Product name can be up to :max characters.',
-            'slug.string' => 'The slug must be plain text.',
-            'sku.required' => 'Please enter a SKU.',
-            'sku.unique' => 'This SKU is already in use. Please choose another SKU.',
-            'price.required' => 'Please enter a price.',
-            'price.numeric' => 'Price must be a number.',
-            'discount_price.numeric' => 'Discount price must be a number.',
+        // ✅ NEW: price matrix
+        // price_matrix[colorKey][sizeKey][price|discounted_price]
+        'price_matrix' => 'sometimes|array',
+        'price_matrix.*' => 'array',
+        'price_matrix.*.*' => 'array',
+        'price_matrix.*.*.price' => 'nullable|numeric|min:0',
+        'price_matrix.*.*.discounted_price' => 'nullable|numeric|min:0',
+    ];
 
-            // Stock
-            'stock_quantity.required_without' => 'Enter a “Stock quantity” or fill the stock matrix below.',
-            'stock_quantity.integer' => 'Stock quantity must be a whole number.',
-            'stock_quantity.min' => 'Stock quantity cannot be negative.',
+    $messages = [
+        // Basics
+        'name.required' => 'Please enter a product name.',
+        'name.max' => 'Product name can be up to :max characters.',
+        'slug.string' => 'The slug must be plain text.',
+        'sku.required' => 'Please enter a SKU.',
+        'sku.unique' => 'This SKU is already in use. Please choose another SKU.',
+        'price.required' => 'Please enter a price.',
+        'price.numeric' => 'Price must be a number.',
+        'discount_price.numeric' => 'Discount price must be a number.',
 
-            // Status / Relations
-            'status.boolean' => 'Status must be on or off.',
-            'category_id.required' => 'Please choose a category.',
-            'category_id.exists' => 'The selected category is not valid.',
-            'collection_id.exists' => 'The selected collection is not valid.',
+        // Stock
+        'stock_quantity.required_without' => 'Enter a “Stock quantity” or fill the stock matrix below.',
+        'stock_quantity.integer' => 'Stock quantity must be a whole number.',
+        'stock_quantity.min' => 'Stock quantity cannot be negative.',
 
-            // Sizes / Colors
-            'sizes.array' => 'Sizes must be sent as a list.',
-            'sizes.*.string' => 'Each size must be text.',
-            'sizes.*.max' => 'Each size can be up to :max characters.',
-            'colors.array' => 'Colors must be sent as a list.',
-            'colors.*.name.required_with' => 'Every color needs a name.',
-            'colors.*.name.max' => 'Color names can be up to :max characters.',
-            'colors.*.color_code.regex' => 'Use a valid hex color like #FFCC00.',
-            'colors.*.hex.regex' => 'Use a valid hex color like #FFCC00.',
+        // Status / Relations
+        'status.boolean' => 'Status must be on or off.',
+        'category_id.required' => 'Please choose a category.',
+        'category_id.exists' => 'The selected category is not valid.',
+        'collection_id.exists' => 'The selected collection is not valid.',
 
-            // Images
-            'images.array' => 'Please select one or more images.',
-            'images.*.image' => 'Each file must be an image (jpg, jpeg, png, gif, webp, avif).',
-            'images.*.max' => 'Each image must be 4 MB or smaller.',
-            'images.*.uploaded' => 'We couldn’t upload this image. Try a smaller file or a different format.',
-            'image_color_codes.*.regex' => 'Image color must be a valid hex like #A1B2C3.',
-            'image_color_hexes.*.regex' => 'Image color must be a valid hex like #A1B2C3.',
+        // Sizes / Colors
+        'sizes.array' => 'Sizes must be sent as a list.',
+        'sizes.*.string' => 'Each size must be text.',
+        'sizes.*.max' => 'Each size can be up to :max characters.',
+        'colors.array' => 'Colors must be sent as a list.',
+        'colors.*.name.required_with' => 'Every color needs a name.',
+        'colors.*.name.max' => 'Color names can be up to :max characters.',
+        'colors.*.color_code.regex' => 'Use a valid hex color like #FFCC00.',
+        'colors.*.hex.regex' => 'Use a valid hex color like #FFCC00.',
 
-            // Stock matrix
-            'stock_matrix.array' => 'The stock matrix must be a grid of numbers.',
-            'stock_matrix.*.array' => 'Each row in the stock matrix must be a list of numbers.',
-            'stock_matrix.*.*.integer' => 'Stock quantities in the matrix must be whole numbers.',
-            'stock_matrix.*.*.min' => 'Stock quantities in the matrix cannot be negative.',
-        ];
+        // Images
+        'images.array' => 'Please select one or more images.',
+        'images.*.image' => 'Each file must be an image (jpg, jpeg, png, gif, webp, avif).',
+        'images.*.max' => 'Each image must be 4 MB or smaller.',
+        'images.*.uploaded' => 'We couldn’t upload this image. Try a smaller file or a different format.',
+        'image_color_codes.*.regex' => 'Image color must be a valid hex like #A1B2C3.',
+        'image_color_hexes.*.regex' => 'Image color must be a valid hex like #A1B2C3.',
 
-        $attributes = [
-            'description_ar' => 'Arabic description',
-            'discount_price' => 'discounted price',
-            'stock_quantity' => 'stock quantity',
-            'category_id' => 'category',
-            'collection_id' => 'collection',
+        // Stock matrix
+        'stock_matrix.array' => 'The stock matrix must be a grid of numbers.',
+        'stock_matrix.*.array' => 'Each row in the stock matrix must be a list of numbers.',
+        'stock_matrix.*.*.integer' => 'Stock quantities in the matrix must be whole numbers.',
+        'stock_matrix.*.*.min' => 'Stock quantities in the matrix cannot be negative.',
 
-            'sizes.*' => 'size',
-            'colors.*.name' => 'color name',
-            'colors.*.color_code' => 'color hex code',
-            'colors.*.hex' => 'color hex code',
+        // ✅ NEW price matrix
+        'price_matrix.array' => 'The price matrix must be a grid.',
+        'price_matrix.*.*.price.numeric' => 'Each option price must be a number.',
+        'price_matrix.*.*.price.min' => 'Option price cannot be negative.',
+        'price_matrix.*.*.discounted_price.numeric' => 'Each option discount must be a number.',
+        'price_matrix.*.*.discounted_price.min' => 'Option discount cannot be negative.',
+    ];
 
-            'images' => 'images',
-            'images.*' => 'image',
-            'image_color_codes.*' => 'image color hex',
-            'image_color_hexes.*' => 'image color hex',
+    $attributes = [
+        'description_ar' => 'Arabic description',
+        'discount_price' => 'discounted price',
+        'stock_quantity' => 'stock quantity',
+        'category_id' => 'category',
+        'collection_id' => 'collection',
 
-            'stock_matrix' => 'stock matrix',
-            'stock_matrix.*.*' => 'stock quantity',
-        ];
+        'sizes.*' => 'size',
+        'colors.*.name' => 'color name',
+        'colors.*.color_code' => 'color hex code',
+        'colors.*.hex' => 'color hex code',
 
-        $validated = $request->validate($rules, $messages, $attributes);
+        'images' => 'images',
+        'images.*' => 'image',
+        'image_color_codes.*' => 'image color hex',
+        'image_color_hexes.*' => 'image color hex',
 
-        return DB::transaction(function () use ($request, $validated) {
+        'stock_matrix' => 'stock matrix',
+        'stock_matrix.*.*' => 'stock quantity',
 
-            // 1) Create product with a UNIQUE slug (from input or name)
-            $baseSlug = Str::slug($validated['slug'] ?? $validated['name']);
-            $slug = $baseSlug;
-            $i = 1;
-            while (Product::where('slug', $slug)->exists()) {
-                $slug = "{$baseSlug}-{$i}";
-                $i++;
+        // ✅ NEW
+        'price_matrix' => 'price matrix',
+        'price_matrix.*.*.price' => 'option price',
+        'price_matrix.*.*.discounted_price' => 'option discounted price',
+    ];
+
+    $validated = $request->validate($rules, $messages, $attributes);
+
+    return DB::transaction(function () use ($request, $validated) {
+
+        // 1) Create product with unique slug
+        $baseSlug = Str::slug($validated['slug'] ?? $validated['name']);
+        $slug = $baseSlug;
+        $i = 1;
+        while (Product::where('slug', $slug)->exists()) {
+            $slug = "{$baseSlug}-{$i}";
+            $i++;
+        }
+
+        $product = Product::create([
+            'name' => $validated['name'],
+            'slug' => $slug,
+            'sku' => $validated['sku'],
+            'description' => $validated['description'] ?? null,
+            'description_ar' => $validated['description_ar'] ?? null,
+            'price' => $validated['price'],
+            'discount_price' => $validated['discount_price'] ?? null,
+            'stock_quantity' => $validated['stock_quantity'] ?? 0, // may be replaced by matrix sum
+            'status' => $request->boolean('status') ? 1 : 0,
+            'category_id' => $validated['category_id'],
+            'collection_id' => $validated['collection_id'] ?? null,
+        ]);
+
+        // 2) Sizes -> index → id mapping
+        $sizeIdByIndex = [];
+        foreach ((array) $request->input('sizes', []) as $idx => $sizeName) {
+            $sizeName = trim((string) $sizeName);
+            if ($sizeName === '') {
+                $sizeIdByIndex[$idx] = null;
+                continue;
+            }
+            $size = $product->sizes()->create(['size' => $sizeName]);
+            $sizeIdByIndex[$idx] = $size->id;
+        }
+
+        // 3) Colors -> index → id mapping
+        $colorIdByIndex = [];
+        foreach ((array) $request->input('colors', []) as $idx => $c) {
+            $name = isset($c['name']) ? trim((string) $c['name']) : null;
+            $code = $c['color_code'] ?? $c['hex'] ?? null;
+            $code = $code ? strtoupper($code) : null;
+
+            if (!$name || !$code) {
+                $colorIdByIndex[$idx] = null;
+                continue;
             }
 
-            $product = Product::create([
-                'name' => $validated['name'],
-                'slug' => $slug,
-                'sku' => $validated['sku'],
-                'description' => $validated['description'] ?? null,
-                'description_ar' => $validated['description_ar'] ?? null,
-                'price' => $validated['price'],
-                'discount_price' => $validated['discount_price'] ?? null,
-                'stock_quantity' => $validated['stock_quantity'] ?? 0, // will be replaced by matrix sum if provided
-                'status' => $request->boolean('status') ? 1 : 0,
-                'category_id' => $validated['category_id'],
-                'collection_id' => $validated['collection_id'] ?? null,
+            $row = $product->colors()->create([
+                'name' => $name,
+                'color_code' => $code,
             ]);
+            $colorIdByIndex[$idx] = $row->id;
+        }
 
-            // 2) Sizes -> keep index → id mapping aligned with request order
-            $sizeIdByIndex = [];
-            foreach ((array) $request->input('sizes', []) as $idx => $sizeName) {
-                $sizeName = trim((string) $sizeName);
-                if ($sizeName === '') {
-                    $sizeIdByIndex[$idx] = null;
-                    continue;
-                }
-                $size = $product->sizes()->create(['size' => $sizeName]);
-                $sizeIdByIndex[$idx] = $size->id;
-            }
+        // 4) Images
+        $files = (array) $request->file('images', []);
+        $imageCodesPri = (array) $request->input('image_color_codes', []);
+        $imageCodesAlt = (array) $request->input('image_color_hexes', []);
+        foreach ($files as $i => $file) {
+            if (!$file) continue;
 
-            // 3) Colors -> keep index → id mapping aligned with request order
-            $colorIdByIndex = [];
-            foreach ((array) $request->input('colors', []) as $idx => $c) {
-                $name = isset($c['name']) ? trim((string) $c['name']) : null;
-                $code = $c['color_code'] ?? $c['hex'] ?? null;
-                $code = $code ? strtoupper($code) : null;
+            $path = $file->store('products', 'public');
+            $colorCode = $imageCodesPri[$i] ?? $imageCodesAlt[$i] ?? null;
 
-                if (!$name || !$code) {
-                    $colorIdByIndex[$idx] = null;
-                    continue;
-                }
+            $product->images()->create([
+                'image_path' => $path,
+                'alt_text' => $product->name,
+                'color_code' => $colorCode ? strtoupper($colorCode) : null,
+                'thumbnail' => $i === 0,
+            ]);
+        }
 
-                $row = $product->colors()->create([
-                    'name' => $name,
-                    'color_code' => $code,
+        // 5) Stock matrix
+        $matrix = (array) $request->input('stock_matrix', []);
+        $inserted = 0;
+        $totalFromMatrix = 0;
+
+        foreach ($matrix as $ciKey => $row) {
+            if (!is_array($row)) continue;
+
+            $colorId = $ciKey === 'na' ? null : ($colorIdByIndex[(int) $ciKey] ?? null);
+
+            foreach ($row as $siKey => $qtyRaw) {
+                $qty = max(0, (int) $qtyRaw);
+
+                $sizeId = $siKey === 'na' ? null : ($sizeIdByIndex[(int) $siKey] ?? null);
+
+                if (is_null($colorId) && is_null($sizeId)) continue;
+                if ($ciKey !== 'na' && is_null($colorId)) continue;
+                if ($siKey !== 'na' && is_null($sizeId)) continue;
+                if ($qty === 0) continue;
+
+                $product->stock()->create([
+                    'product_id' => $product->id,
+                    'color_id' => $colorId,
+                    'size_id' => $sizeId,
+                    'quantity_on_hand' => $qty,
                 ]);
-                $colorIdByIndex[$idx] = $row->id;
+
+                $inserted++;
+                $totalFromMatrix += $qty;
             }
+        }
 
-            // 4) Images (color tagging optional)
-            $files = (array) $request->file('images', []);
-            $imageCodesPri = (array) $request->input('image_color_codes', []);
-            $imageCodesAlt = (array) $request->input('image_color_hexes', []);
-            foreach ($files as $i => $file) {
-                if (!$file) {
-                    continue;
-                }
-                $path = $file->store('products', 'public');
-                $colorCode = $imageCodesPri[$i] ?? $imageCodesAlt[$i] ?? null;
-                $product->images()->create([
-                    'image_path' => $path,
-                    'alt_text' => $product->name,
-                    'color_code' => $colorCode ? strtoupper($colorCode) : null,
-                    'thumbnail' => $i === 0,
-                ]);
-            }
+        if ($inserted > 0) {
+            $product->update(['stock_quantity' => $totalFromMatrix]);
+        }
 
-            // 5) Stock matrix → product_stock rows
-            $matrix = (array) $request->input('stock_matrix', []);
-            $inserted = 0;
-            $totalFromMatrix = 0;
+        // 6) ✅ Price matrix (optional)
+        // IMPORTANT: rename prices() to your real relation
+        if (method_exists($product, 'prices')) {
 
-            foreach ($matrix as $ciKey => $row) {
-                if (!is_array($row)) {
-                    continue;
-                }
+            $pm = (array) $request->input('price_matrix', []);
+            $hasPriceMatrix = $request->has('price_matrix');
 
-                // Resolve color id (nullable). 'na' means no color axis.
-                $colorId = $ciKey === 'na' ? null :
-                    ($colorIdByIndex[(int) $ciKey] ?? null);
+            if ($hasPriceMatrix) {
+                foreach ($pm as $ciKey => $row) {
+                    if (!is_array($row)) continue;
 
-                foreach ($row as $siKey => $qtyRaw) {
-                    $qty = max(0, (int) $qtyRaw);
+                    $colorId = $ciKey === 'na' ? null : ($colorIdByIndex[(int) $ciKey] ?? null);
 
-                    // Resolve size id (nullable). 'na' means no size axis.
-                    $sizeId = $siKey === 'na' ? null :
-                        ($sizeIdByIndex[(int) $siKey] ?? null);
+                    foreach ($row as $siKey => $cell) {
+                        if (!is_array($cell)) continue;
 
-                    // Skip if both axes are NA (no options). In that case, rely on product-level stock.
-                    if (is_null($colorId) && is_null($sizeId)) {
-                        continue;
+                        $sizeId = $siKey === 'na' ? null : ($sizeIdByIndex[(int) $siKey] ?? null);
+
+                        // ignore invalid mappings
+                        if (is_null($colorId) && is_null($sizeId)) continue;
+                        if ($ciKey !== 'na' && is_null($colorId)) continue;
+                        if ($siKey !== 'na' && is_null($sizeId)) continue;
+
+                        $price = $cell['price'] ?? null;
+                        $disc  = $cell['discounted_price'] ?? null;
+
+                        // Store only if at least one value exists
+                        $hasAny = ($price !== null && $price !== '') || ($disc !== null && $disc !== '');
+                        if (!$hasAny) continue;
+
+                        $product->prices()->create([
+                            'product_id' => $product->id,
+                            'color_id' => $colorId,
+                            'size_id' => $sizeId,
+                            'price' => ($price === '' ? null : (float) $price),
+                            'discounted_price' => ($disc === '' ? null : (float) $disc),
+                        ]);
                     }
-
-                    // If both the referenced option rows were skipped/invalid, ignore this cell.
-                    // (Keeps index alignment safe even if a color/size was filtered out above.)
-                    if ($ciKey !== 'na' && is_null($colorId)) {
-                        continue;
-                    }
-                    if ($siKey !== 'na' && is_null($sizeId)) {
-                        continue;
-                    }
-
-                    // Only insert meaningful rows; you may store zeros too if you prefer explicit 0s
-                    if ($qty === 0) {
-                        continue;
-                    }
-
-                    // Create product_stock row (use model relation or DB::table)
-                    $product->stock()->create([
-                        'product_id' => $product->id,
-                        'color_id' => $colorId, // nullable
-                        'size_id' => $sizeId,  // nullable
-                        'quantity_on_hand' => $qty,
-                        // 'quantity_reserved' => 0, // if your table has it
-                    ]);
-
-                    $inserted++;
-                    $totalFromMatrix += $qty;
                 }
             }
+        }
 
-            // 6) If we inserted any per-option stock rows, override product-level total
-            if ($inserted > 0) {
-                $product->update(['stock_quantity' => $totalFromMatrix]);
-            }
-
-            return redirect()
-                ->route('admin.products.index')
-                ->with('success', 'Product created successfully!');
-        });
-    }
+        return redirect()
+            ->route('admin.products.index')
+            ->with('success', 'Product created successfully!');
+    });
+}
 
 
 
@@ -285,306 +324,338 @@ class ProductController extends Controller
     {
         $categories = Category::where('status', 1)->latest()->get();
         $collections = Collection::where('status', 1)->latest()->get();        // Ensure the product has images loaded
-        $product->load(['images', 'colors', 'sizes', 'stock']);
+        $product->load(['images', 'colors', 'sizes', 'stock','prices']);
         // return $product;
         return view('admin.products.edit', compact('product', 'categories', 'collections'));
     }
 
 
-    public function update(Request $request, Product $product)
-    {
-        $rules = [
-            'name' => 'required|string|max:255',
-            'slug' => ['nullable', 'string', Rule::unique('products', 'slug')->ignore($product->id)],
-            'sku' => ['required', 'string', Rule::unique('products', 'sku')->ignore($product->id)],
-            'description' => 'nullable|string',
-            'description_ar' => 'nullable|string',
-            'price' => 'required|numeric|min:0',
-            'discount_price' => 'nullable|numeric|min:0',
+public function update(Request $request, Product $product)
+{
+    $rules = [
+        'name' => 'required|string|max:255',
+        'slug' => ['nullable', 'string', Rule::unique('products', 'slug')->ignore($product->id)],
+        'sku' => ['required', 'string', Rule::unique('products', 'sku')->ignore($product->id)],
+        'description' => 'nullable|string',
+        'description_ar' => 'nullable|string',
 
-            // if you submit a per-option matrix, the single quantity can be omitted
-            'stock_quantity' => 'required_without:stock_matrix|integer|min:0',
+        // Global fallback price (still required)
+        'price' => 'required|numeric|min:0',
+        'discount_price' => 'nullable|numeric|min:0',
 
-            'status' => 'sometimes|boolean',
-            'category_id' => 'required|exists:categories,id',
-            'collection_id' => 'nullable|exists:collections,id',
+        // if you submit a per-option matrix, the single quantity can be omitted
+        'stock_quantity' => 'required_without:stock_matrix|integer|min:0',
 
-            // sizes/colors
-            'sizes' => 'sometimes|array',
-            'sizes.*' => 'string|max:50',
-            'colors' => 'sometimes|array',
-            'colors.*.name' => 'required_with:colors|string|max:50',
-            'colors.*.color_code' => ['nullable', 'regex:/^#([0-9A-Fa-f]{6})$/'],
-            'colors.*.hex' => ['nullable', 'regex:/^#([0-9A-Fa-f]{6})$/'],
+        'status' => 'sometimes|boolean',
+        'category_id' => 'required|exists:categories,id',
+        'collection_id' => 'nullable|exists:collections,id',
 
-            // existing image color updates
-            'image_existing' => 'sometimes|array',
-            'image_existing.*.color_code' => ['nullable', 'regex:/^#([0-9A-Fa-f]{6})$/'],
+        // sizes/colors
+        'sizes' => 'sometimes|array',
+        'sizes.*' => 'string|max:50',
+        'colors' => 'sometimes|array',
+        'colors.*.name' => 'required_with:colors|string|max:50',
+        'colors.*.color_code' => ['nullable', 'regex:/^#([0-9A-Fa-f]{6})$/'],
+        'colors.*.hex' => ['nullable', 'regex:/^#([0-9A-Fa-f]{6})$/'],
 
-            // new images
-            'images' => 'sometimes|array',
-            'images.*' => 'nullable|image|max:4096', // 4 MB per image
-            'image_color_hexes' => 'sometimes|array',
-            'image_color_hexes.*' => ['nullable', 'regex:/^#([0-9A-Fa-f]{6})$/'],
-            'new_image_uids' => 'sometimes|array',
-            'new_image_uids.*' => 'nullable|string',
+        // existing image color updates
+        'image_existing' => 'sometimes|array',
+        'image_existing.*.color_code' => ['nullable', 'regex:/^#([0-9A-Fa-f]{6})$/'],
 
-            // thumbnail selection
-            'thumbnail_existing_id' => 'nullable|integer',
-            'thumbnail_new_uid' => 'nullable|string',
+        // new images
+        'images' => 'sometimes|array',
+        'images.*' => 'nullable|image|max:4096', // 4 MB per image
+        'image_color_hexes' => 'sometimes|array',
+        'image_color_hexes.*' => ['nullable', 'regex:/^#([0-9A-Fa-f]{6})$/'],
+        'new_image_uids' => 'sometimes|array',
+        'new_image_uids.*' => 'nullable|string',
 
-            // quantity matrix
-            'stock_matrix' => 'sometimes|array',
-            'stock_matrix.*' => 'array',
-            'stock_matrix.*.*' => 'integer|min:0',
-        ];
+        // thumbnail selection
+        'thumbnail_existing_id' => 'nullable|integer',
+        'thumbnail_new_uid' => 'nullable|string',
 
-        $messages = [
-            // basics
-            'name.required' => 'Please enter a product name.',
-            'price.required' => 'Please enter a price.',
-            'price.numeric' => 'Price must be a number.',
-            'discount_price.numeric' => 'Discount price must be a number.',
-            'slug.unique' => 'This slug is already in use. Please choose another.',
-            'sku.required' => 'Please enter a SKU.',
-            'sku.unique' => 'This SKU is already in use.',
+        // quantity matrix
+        'stock_matrix' => 'sometimes|array',
+        'stock_matrix.*' => 'array',
+        'stock_matrix.*.*' => 'integer|min:0',
 
-            // stock
-            'stock_quantity.required_without' => 'Enter a “Stock quantity” or fill the stock matrix below.',
-            'stock_quantity.integer' => 'Stock quantity must be a whole number.',
-            'stock_quantity.min' => 'Stock quantity cannot be negative.',
+        // ✅ NEW: price matrix
+        // price_matrix[colorKey][sizeKey][price|discounted_price]
+        'price_matrix' => 'sometimes|array',
+        'price_matrix.*' => 'array',
+        'price_matrix.*.*' => 'array',
+        'price_matrix.*.*.price' => 'nullable|numeric|min:0',
+        'price_matrix.*.*.discounted_price' => 'nullable|numeric|min:0',
+    ];
 
-            // relationships
-            'category_id.required' => 'Please choose a category.',
-            'category_id.exists' => 'The selected category is not valid.',
-            'collection_id.exists' => 'The selected collection is not valid.',
+    $messages = [
+        // basics
+        'name.required' => 'Please enter a product name.',
+        'price.required' => 'Please enter a price.',
+        'price.numeric' => 'Price must be a number.',
+        'discount_price.numeric' => 'Discount price must be a number.',
+        'slug.unique' => 'This slug is already in use. Please choose another.',
+        'sku.required' => 'Please enter a SKU.',
+        'sku.unique' => 'This SKU is already in use.',
 
-            // sizes/colors
-            'sizes.array' => 'Sizes must be sent as a list.',
-            'sizes.*.string' => 'Each size must be text.',
-            'colors.array' => 'Colors must be sent as a list.',
-            'colors.*.name.required_with' => 'Every color needs a name.',
-            'colors.*.name.max' => 'Color names can be up to :max characters.',
-            'colors.*.color_code.regex' => 'Use a valid hex color like #FFCC00.',
-            'colors.*.hex.regex' => 'Use a valid hex color like #FFCC00.',
+        // stock
+        'stock_quantity.required_without' => 'Enter a “Stock quantity” or fill the stock matrix below.',
+        'stock_quantity.integer' => 'Stock quantity must be a whole number.',
+        'stock_quantity.min' => 'Stock quantity cannot be negative.',
 
-            // images (this is where the confusing message comes from)
-            'images.array' => 'Please select one or more images.',
-            'images.*.image' => 'Each file must be an image (jpg, jpeg, png, gif, webp, avif).',
-            'images.*.max' => 'Each image must be 4 MB or smaller.',
-            'images.*.uploaded' => 'We couldn’t upload this image. Try a smaller file, or a different format.',
-            // (Sometimes Laravel keys it as images.0, images.1; the wildcard above covers them.)
+        // relationships
+        'category_id.required' => 'Please choose a category.',
+        'category_id.exists' => 'The selected category is not valid.',
+        'collection_id.exists' => 'The selected collection is not valid.',
 
-            // image color hexes
-            'image_existing.*.color_code.regex' => 'Image color must be a valid hex like #A1B2C3.',
-            'image_color_hexes.*.regex' => 'Image color must be a valid hex like #A1B2C3.',
+        // sizes/colors
+        'sizes.array' => 'Sizes must be sent as a list.',
+        'sizes.*.string' => 'Each size must be text.',
+        'colors.array' => 'Colors must be sent as a list.',
+        'colors.*.name.required_with' => 'Every color needs a name.',
+        'colors.*.name.max' => 'Color names can be up to :max characters.',
+        'colors.*.color_code.regex' => 'Use a valid hex color like #FFCC00.',
+        'colors.*.hex.regex' => 'Use a valid hex color like #FFCC00.',
 
-            // matrix
-            'stock_matrix.array' => 'The stock matrix must be a grid of numbers.',
-            'stock_matrix.*.array' => 'Each row in the stock matrix must be a list of numbers.',
-            'stock_matrix.*.*.integer' => 'Stock quantities in the matrix must be whole numbers.',
-            'stock_matrix.*.*.min' => 'Stock quantities in the matrix cannot be negative.',
-        ];
+        // images
+        'images.array' => 'Please select one or more images.',
+        'images.*.image' => 'Each file must be an image (jpg, jpeg, png, gif, webp, avif).',
+        'images.*.max' => 'Each image must be 4 MB or smaller.',
+        'images.*.uploaded' => 'We couldn’t upload this image. Try a smaller file, or a different format.',
 
-        $attributes = [
-            'description_ar' => 'Arabic description',
-            'discount_price' => 'discounted price',
-            'stock_quantity' => 'stock quantity',
-            'category_id' => 'category',
-            'collection_id' => 'collection',
+        // image color hexes
+        'image_existing.*.color_code.regex' => 'Image color must be a valid hex like #A1B2C3.',
+        'image_color_hexes.*.regex' => 'Image color must be a valid hex like #A1B2C3.',
 
-            'sizes.*' => 'size',
-            'colors.*.name' => 'color name',
-            'colors.*.color_code' => 'color hex code',
-            'colors.*.hex' => 'color hex code',
+        // matrix
+        'stock_matrix.array' => 'The stock matrix must be a grid of numbers.',
+        'stock_matrix.*.array' => 'Each row in the stock matrix must be a list of numbers.',
+        'stock_matrix.*.*.integer' => 'Stock quantities in the matrix must be whole numbers.',
+        'stock_matrix.*.*.min' => 'Stock quantities in the matrix cannot be negative.',
 
-            'images' => 'images',
-            'images.*' => 'image',
-            'image_existing.*.color_code' => 'image color hex',
-            'image_color_hexes.*' => 'image color hex',
+        // ✅ NEW price matrix messages
+        'price_matrix.array' => 'The price matrix must be a grid.',
+        'price_matrix.*.*.price.numeric' => 'Each option price must be a number.',
+        'price_matrix.*.*.price.min' => 'Option price cannot be negative.',
+        'price_matrix.*.*.discounted_price.numeric' => 'Each option discount must be a number.',
+        'price_matrix.*.*.discounted_price.min' => 'Option discount cannot be negative.',
+    ];
 
-            'thumbnail_existing_id' => 'thumbnail (existing image)',
-            'thumbnail_new_uid' => 'thumbnail (new image)',
+    $attributes = [
+        'description_ar' => 'Arabic description',
+        'discount_price' => 'discounted price',
+        'stock_quantity' => 'stock quantity',
+        'category_id' => 'category',
+        'collection_id' => 'collection',
 
-            'stock_matrix' => 'stock matrix',
-            'stock_matrix.*.*' => 'stock quantity',
-        ];
+        'sizes.*' => 'size',
+        'colors.*.name' => 'color name',
+        'colors.*.color_code' => 'color hex code',
+        'colors.*.hex' => 'color hex code',
 
-        $validated = $request->validate($rules, $messages, $attributes);
-        DB::transaction(function () use ($request, $validated, $product) {
+        'images' => 'images',
+        'images.*' => 'image',
+        'image_existing.*.color_code' => 'image color hex',
+        'image_color_hexes.*' => 'image color hex',
 
-            /* -------- 1) Core product fields -------- */
-            $slugInput = $validated['slug'] ?? $validated['name'];
-            $product->update([
-                'name' => $validated['name'],
-                'slug' => Str::slug($slugInput),
-                'sku' => $validated['sku'],
-                'description' => $validated['description'] ?? null,
-                'description_ar' => $validated['description_ar'] ?? null,
-                'price' => $validated['price'],
-                'discount_price' => $validated['discount_price'] ?? null,
-                // stock_quantity will be set again after processing the matrix (if provided)
-                'stock_quantity' => $validated['stock_quantity'] ?? $product->stock_quantity,
-                'status' => $request->boolean('status') ? 1 : 0,
-                'category_id' => $validated['category_id'],
-                'collection_id' => $validated['collection_id'] ?? null,
+        'thumbnail_existing_id' => 'thumbnail (existing image)',
+        'thumbnail_new_uid' => 'thumbnail (new image)',
+
+        'stock_matrix' => 'stock matrix',
+        'stock_matrix.*.*' => 'stock quantity',
+
+        // ✅ NEW
+        'price_matrix' => 'price matrix',
+        'price_matrix.*.*.price' => 'option price',
+        'price_matrix.*.*.discounted_price' => 'option discounted price',
+    ];
+
+    $validated = $request->validate($rules, $messages, $attributes);
+
+    DB::transaction(function () use ($request, $validated, $product) {
+
+        /* -------- 1) Core product fields -------- */
+        $slugInput = $validated['slug'] ?? $validated['name'];
+        $product->update([
+            'name' => $validated['name'],
+            'slug' => Str::slug($slugInput),
+            'sku' => $validated['sku'],
+            'description' => $validated['description'] ?? null,
+            'description_ar' => $validated['description_ar'] ?? null,
+            'price' => $validated['price'],
+            'discount_price' => $validated['discount_price'] ?? null,
+            'stock_quantity' => $validated['stock_quantity'] ?? $product->stock_quantity,
+            'status' => $request->boolean('status') ? 1 : 0,
+            'category_id' => $validated['category_id'],
+            'collection_id' => $validated['collection_id'] ?? null,
+        ]);
+
+        /* -------- 2) Replace Sizes (keeping input order -> index map) -------- */
+        $product->sizes()->delete();
+        $sizeIdByIndex = [];
+        foreach ((array) $request->input('sizes', []) as $idx => $sizeName) {
+            $sizeName = trim((string) $sizeName);
+            if ($sizeName === '') { $sizeIdByIndex[$idx] = null; continue; }
+            $size = $product->sizes()->create(['size' => $sizeName]);
+            $sizeIdByIndex[$idx] = $size->id;
+        }
+
+        /* -------- 3) Replace Colors (keeping input order -> index map) -------- */
+        $product->colors()->delete();
+        $colorIdByIndex = [];
+        foreach ((array) $request->input('colors', []) as $idx => $c) {
+            $name = isset($c['name']) ? trim((string) $c['name']) : null;
+            $code = $c['color_code'] ?? $c['hex'] ?? null;
+            $code = $code ? strtoupper($code) : null;
+
+            if (!$name || !$code) { $colorIdByIndex[$idx] = null; continue; }
+
+            $row = $product->colors()->create([
+                'name' => $name,
+                'color_code' => $code,
+            ]);
+            $colorIdByIndex[$idx] = $row->id;
+        }
+
+        /* -------- 4) Images -------- */
+        foreach ((array) $request->input('image_existing', []) as $imgId => $data) {
+            $img = $product->images()->where('id', (int) $imgId)->first();
+            if (!$img) continue;
+
+            $code = $data['color_code'] ?? null;
+            $img->color_code = $code ? strtoupper($code) : null;
+            $img->save();
+        }
+
+        $files = (array) $request->file('images', []);
+        $newColorHexes = (array) $request->input('image_color_hexes', []);
+        $newUids = (array) $request->input('new_image_uids', []);
+        $createdNewByUid = []; // uid => image id
+
+        foreach ($files as $i => $file) {
+            if (!$file) continue;
+
+            $path = $file->store('products', 'public');
+            $colorCode = $newColorHexes[$i] ?? null;
+            $colorCode = $colorCode ? strtoupper($colorCode) : null;
+
+            $imgModel = $product->images()->create([
+                'image_path' => $path,
+                'alt_text' => $product->name,
+                'color_code' => $colorCode,
+                'thumbnail' => 0,
             ]);
 
-            /* -------- 2) Replace Sizes (keeping input order -> index map) -------- */
-            $product->sizes()->delete(); // cascades product_stock rows that reference size_id
-            $sizeIdByIndex = [];
-            foreach ((array) $request->input('sizes', []) as $idx => $sizeName) {
-                $sizeName = trim((string) $sizeName);
-                if ($sizeName === '') {
-                    $sizeIdByIndex[$idx] = null;
-                    continue;
-                }
-                $size = $product->sizes()->create(['size' => $sizeName]);
-                $sizeIdByIndex[$idx] = $size->id;
+            $uid = $newUids[$i] ?? null;
+            if ($uid) $createdNewByUid[$uid] = $imgModel->id;
+        }
+
+        $thumbExistingId = $request->input('thumbnail_existing_id');
+        $thumbNewUid = $request->input('thumbnail_new_uid');
+
+        if ($thumbExistingId || $thumbNewUid) {
+            $product->images()->update(['thumbnail' => 0]);
+
+            if ($thumbExistingId) {
+                $img = $product->images()->where('id', (int) $thumbExistingId)->first();
+                if ($img) { $img->thumbnail = 1; $img->save(); }
+            } elseif ($thumbNewUid && isset($createdNewByUid[$thumbNewUid])) {
+                $imgId = $createdNewByUid[$thumbNewUid];
+                $img = $product->images()->where('id', $imgId)->first();
+                if ($img) { $img->thumbnail = 1; $img->save(); }
             }
+        } else {
+            if (!$product->images()->where('thumbnail', 1)->exists()) {
+                $first = $product->images()->first();
+                if ($first) { $first->thumbnail = 1; $first->save(); }
+            }
+        }
 
-            /* -------- 3) Replace Colors (keeping input order -> index map) -------- */
-            $product->colors()->delete(); // cascades product_stock rows that reference color_id
-            $colorIdByIndex = [];
-            foreach ((array) $request->input('colors', []) as $idx => $c) {
-                $name = isset($c['name']) ? trim((string) $c['name']) : null;
-                $code = $c['color_code'] ?? $c['hex'] ?? null;
-                $code = $code ? strtoupper($code) : null;
+        /* -------- 5) Stock matrix -> product_stock rows -------- */
+        $matrix = (array) $request->input('stock_matrix', []);
+        $hasMatrix = $request->has('stock_matrix');
+        $totalFromMatrix = 0;
 
-                if (!$name || !$code) {
-                    $colorIdByIndex[$idx] = null;
-                    continue;
-                }
+        foreach ($matrix as $ciKey => $row) {
+            if (!is_array($row)) continue;
 
-                $row = $product->colors()->create([
-                    'name' => $name,
-                    'color_code' => $code,
+            $colorId = $ciKey === 'na' ? null : ($colorIdByIndex[(int) $ciKey] ?? null);
+
+            foreach ($row as $siKey => $qtyRaw) {
+                $qty = max(0, (int) $qtyRaw);
+                $totalFromMatrix += $qty;
+
+                $sizeId = $siKey === 'na' ? null : ($sizeIdByIndex[(int) $siKey] ?? null);
+
+                if (is_null($colorId) && is_null($sizeId)) continue;
+                if ($ciKey !== 'na' && is_null($colorId)) continue;
+                if ($siKey !== 'na' && is_null($sizeId)) continue;
+                if ($qty === 0) continue;
+
+                $product->stock()->create([
+                    'product_id' => $product->id,
+                    'color_id' => $colorId,
+                    'size_id' => $sizeId,
+                    'quantity_on_hand' => $qty,
                 ]);
-                $colorIdByIndex[$idx] = $row->id;
             }
+        }
 
-            /* -------- 4) Images -------- */
-            // existing color updates
-            foreach ((array) $request->input('image_existing', []) as $imgId => $data) {
-                $img = $product->images()->where('id', (int) $imgId)->first();
-                if (!$img)
-                    continue;
-                $code = $data['color_code'] ?? null;
-                $img->color_code = $code ? strtoupper($code) : null;
-                $img->save();
-            }
+        if ($hasMatrix) {
+            $product->update(['stock_quantity' => $totalFromMatrix]);
+        }
 
-            // new images
-            $files = (array) $request->file('images', []);
-            $newColorHexes = (array) $request->input('image_color_hexes', []);
-            $newUids = (array) $request->input('new_image_uids', []);
-            $createdNewByUid = []; // uid => image id
+        /* -------- 6) ✅ Price matrix -> option prices table -------- */
+        // IMPORTANT: rename optionPrices() to your real relation
+        // Example relation: public function optionPrices(){ return $this->hasMany(ProductOptionPrice::class); }
 
-            foreach ($files as $i => $file) {
-                if (!$file)
-                    continue;
+        if (method_exists($product, 'prices')) {
+            // Replace all option prices (because colors/sizes were replaced)
+            $product->prices()->delete();
 
-                $path = $file->store('products', 'public');
-                $colorCode = $newColorHexes[$i] ?? null;
-                $colorCode = $colorCode ? strtoupper($colorCode) : null;
+            $pm = (array) $request->input('price_matrix', []);
+            $hasPriceMatrix = $request->has('price_matrix');
 
-                $imgModel = $product->images()->create([
-                    'image_path' => $path,
-                    'alt_text' => $product->name,
-                    'color_code' => $colorCode,
-                    'thumbnail' => 0,
-                ]);
+            if ($hasPriceMatrix) {
+                foreach ($pm as $ciKey => $row) {
+                    if (!is_array($row)) continue;
 
-                $uid = $newUids[$i] ?? null;
-                if ($uid)
-                    $createdNewByUid[$uid] = $imgModel->id;
-            }
+                    $colorId = $ciKey === 'na' ? null : ($colorIdByIndex[(int) $ciKey] ?? null);
 
-            // thumbnail selection
-            $thumbExistingId = $request->input('thumbnail_existing_id');
-            $thumbNewUid = $request->input('thumbnail_new_uid');
+                    foreach ($row as $siKey => $cell) {
+                        if (!is_array($cell)) continue;
 
-            if ($thumbExistingId || $thumbNewUid) {
-                $product->images()->update(['thumbnail' => 0]);
-                if ($thumbExistingId) {
-                    $img = $product->images()->where('id', (int) $thumbExistingId)->first();
-                    if ($img) {
-                        $img->thumbnail = 1;
-                        $img->save();
-                    }
-                } elseif ($thumbNewUid && isset($createdNewByUid[$thumbNewUid])) {
-                    $imgId = $createdNewByUid[$thumbNewUid];
-                    $img = $product->images()->where('id', $imgId)->first();
-                    if ($img) {
-                        $img->thumbnail = 1;
-                        $img->save();
-                    }
-                }
-            } else {
-                if (!$product->images()->where('thumbnail', 1)->exists()) {
-                    $first = $product->images()->first();
-                    if ($first) {
-                        $first->thumbnail = 1;
-                        $first->save();
+                        $sizeId = $siKey === 'na' ? null : ($sizeIdByIndex[(int) $siKey] ?? null);
+
+                        if (is_null($colorId) && is_null($sizeId)) continue;
+                        if ($ciKey !== 'na' && is_null($colorId)) continue;
+                        if ($siKey !== 'na' && is_null($sizeId)) continue;
+
+                        $price = $cell['price'] ?? null;
+                        $disc  = $cell['discounted_price'] ?? null;
+
+                        // Store only if at least one value is provided.
+                        $hasAny = ($price !== null && $price !== '') || ($disc !== null && $disc !== '');
+                        if (!$hasAny) continue;
+
+                        $product->prices()->create([
+                            'product_id' => $product->id,
+                            'color_id' => $colorId,
+                            'size_id' => $sizeId,
+                            'price' => ($price === '' ? null : (float) $price),
+                            'discounted_price' => ($disc === '' ? null : (float) $disc),
+                        ]);
                     }
                 }
             }
+        }
 
-            /* -------- 5) Stock matrix -> product_stock rows -------- */
+    });
 
-            // At this point, old product_stock rows are already deleted by FK cascades
-            // (because we replaced colors/sizes). We'll recreate from the posted matrix.
-            $matrix = (array) $request->input('stock_matrix', []);
-            $hasMatrix = $request->has('stock_matrix');
-
-            $totalFromMatrix = 0; // sum of all numbers in matrix (including zeros)
-
-            foreach ($matrix as $ciKey => $row) {
-                if (!is_array($row))
-                    continue;
-
-                $colorId = $ciKey === 'na' ? null : ($colorIdByIndex[(int) $ciKey] ?? null);
-
-                foreach ($row as $siKey => $qtyRaw) {
-                    $qty = max(0, (int) $qtyRaw);
-                    $totalFromMatrix += $qty;
-
-                    $sizeId = $siKey === 'na' ? null : ($sizeIdByIndex[(int) $siKey] ?? null);
-
-                    // skip impossible combo (both axes NA) → use product-level quantity instead
-                    if (is_null($colorId) && is_null($sizeId)) {
-                        continue;
-                    }
-                    // axis provided but couldn't map (e.g., user removed that option)
-                    if ($ciKey !== 'na' && is_null($colorId))
-                        continue;
-                    if ($siKey !== 'na' && is_null($sizeId))
-                        continue;
-
-                    // store only meaningful rows; zeros are implicit
-                    if ($qty === 0)
-                        continue;
-
-                    $product->stock()->create([
-                        'product_id' => $product->id,
-                        'color_id' => $colorId, // nullable
-                        'size_id' => $sizeId,  // nullable
-                        'quantity_on_hand' => $qty,
-                        // 'quantity_reserved' => 0,
-                    ]);
-                }
-            }
-
-            // If a matrix was posted, product-level stock should mirror its sum
-            if ($hasMatrix) {
-                $product->update(['stock_quantity' => $totalFromMatrix]);
-            }
-        });
-
-        return redirect()
-            ->route('admin.products.index')
-            ->with('success', 'Product updated successfully!');
-    }
+    return redirect()
+        ->route('admin.products.index')
+        ->with('success', 'Product updated successfully!');
+}
 
 
 

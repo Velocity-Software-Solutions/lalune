@@ -53,6 +53,12 @@ class Product extends Model
         return $this->hasMany(ProductColor::class);
     }
 
+    public function prices()
+{
+    return $this->hasMany(ProductPrice::class);
+}
+
+
     public function stock()
     {
         return $this->hasMany(ProductStock::class, 'product_id');
