@@ -408,7 +408,7 @@ class CartController extends Controller
             unset($cart[$id]);
             session()->put('cart', $cart);
         }
-        return redirect()->route('home');
+        return redirect()->route('cart.index');
     }
 
     public function applyPromo(Request $request)
