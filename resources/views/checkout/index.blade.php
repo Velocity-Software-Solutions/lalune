@@ -427,12 +427,43 @@
             <input type="hidden" name="shipping_cost"
                 :value="(hasFreeShipping ? 0 : Number(shippingBefore || 0)).toFixed(2)">
 
-            <button type="submit"
-                class="w-full py-3 text-lg font-semibold text-white bg-gray-700 rounded
-                       hover:bg-gray-700/90 focus:outline-none focus:ring-2 focus:ring-black/40
-                       disabled:opacity-50 disabled:cursor-not-allowed">
-                {{ __('checkout.confirm_pay') }}
-            </button>
+<button type="submit"
+    class="group relative w-full overflow-hidden rounded-xl bg-black py-3 text-lg font-semibold text-white
+           focus:outline-none focus:ring-2 focus:ring-black/40
+           transition-all duration-300 ease-out
+           hover:shadow-[0_0_30px_rgba(255,255,255,0.08)]
+           active:scale-[0.98]
+           disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none">
+
+    <!-- Subtle premium shine sweep -->
+    <span class="pointer-events-none absolute inset-0 -translate-x-full
+                 bg-gradient-to-r from-transparent via-white/20 to-transparent
+                 transition-transform duration-1000 ease-out
+                 group-hover:translate-x-full"></span>
+
+    <span class="relative flex items-center justify-center gap-2">
+
+        <!-- Lock Icon -->
+        <span class="material-icons-outlined text-white/80
+                     transition-all duration-300
+                     group-hover:text-white
+                     group-hover:scale-110">
+            lock
+        </span>
+
+        <!-- Text -->
+        <span class="tracking-wide">
+            Secure Checkout
+        </span>
+    </span>
+
+    <!-- Bottom accent glow line -->
+    <span class="pointer-events-none absolute bottom-0 left-1/2 h-[2px] w-0
+                 -translate-x-1/2 bg-white/50
+                 transition-all duration-400 ease-out
+                 group-hover:w-2/3"></span>
+</button>
+
         </form>
     </div>
 
