@@ -5,6 +5,8 @@
 @push('head')
     <meta name="description" content="{{ Str::limit(strip_tags($product->description), 150) }}">
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&icon_names=shopping_bag_speed" />
 @endpush
 
 @section('content')
@@ -13,16 +15,16 @@
         Page notes (kept ONLY here at the top):
         - Manual carousel only: no auto-advance timer, no start()/stop() interval logic.
         - Variant-aware pricing:
-          * If a prices-row exists for a variant: use that row price/discount (discounted_price > 0), ignore base discount.
-          * If no prices-row: fall back to base price + base discount (discount_price > 0).
-          * When selection is incomplete, show a range computed from in-stock variants (effective prices).
+                                                          * If a prices-row exists for a variant: use that row price/discount (discounted_price > 0), ignore base discount.
+                                                          * If no prices-row: fall back to base price + base discount (discount_price > 0).
+                                                          * When selection is incomplete, show a range computed from in-stock variants (effective prices).
         - Images:
-          * Filter by selected color if present, and keep thumbnails first if flagged.
+                                                          * Filter by selected color if present, and keep thumbnails first if flagged.
         - Stock:
-          * Availability and max quantity are based on variant stock rows.
+                                                          * Availability and max quantity are based on variant stock rows.
         */
 
-        $colorHexById = $product->colors->pluck('color_code', 'id')->map(fn ($v) => strtoupper($v));
+        $colorHexById = $product->colors->pluck('color_code', 'id')->map(fn($v) => strtoupper($v));
         $sizeNameById = $product->sizes->pluck('size', 'id');
 
         $stockPayload = $product->stock
@@ -31,8 +33,8 @@
                     'id' => $row->id,
                     'colorId' => $row->color_id,
                     'sizeId' => $row->size_id,
-                    'colorHex' => $row->color_id ? ($colorHexById[$row->color_id] ?? null) : null,
-                    'size' => $row->size_id ? ($sizeNameById[$row->size_id] ?? null) : null,
+                    'colorHex' => $row->color_id ? $colorHexById[$row->color_id] ?? null : null,
+                    'size' => $row->size_id ? $sizeNameById[$row->size_id] ?? null : null,
                     'qty' => (int) ($row->available_qty ?? $row->quantity_on_hand),
                 ];
             })
@@ -71,7 +73,9 @@
         }
 
         $baseDiscount =
-            $product->discount_price !== null && (float) $product->discount_price > 0 ? (float) $product->discount_price : null;
+            $product->discount_price !== null && (float) $product->discount_price > 0
+                ? (float) $product->discount_price
+                : null;
     @endphp
 
     @if ($errors->any())
@@ -86,50 +90,37 @@
     @endif
 
     <div class="min-h-screen py-3" x-data="{ showModal: false, modalImage: '' }">
-        <div
-            x-data="productPage(@js([
-                'images' => $product->images
-                    ->map(function ($img) {
-                        return [
-                            'src' => asset('storage/' . $img->image_path),
-                            'alt' => $img->alt_text ?? __('product.image_alt'),
-                            'colorHex' => $img->color_code ? strtoupper($img->color_code) : null,
-                            'isThumb' => (bool) ($img->thumbnail ?? 0),
-                        ];
-                    })
-                    ->values(),
-                'colors' => $product->colors
-                    ->map(fn($c) => ['id' => $c->id, 'name' => $c->name, 'hex' => strtoupper($c->color_code)])
-                    ->values(),
-                'sizes' => $product->sizes
-                    ->map(fn($s) => ['id' => $s->id, 'size' => $s->size])
-                    ->values(),
-                'stock' => $stockPayload,
-                'prices' => $pricePayload,
-                'productBasePrice' => (float) $product->price,
-                'productBaseDiscount' => $baseDiscount,
-                'productTotalQty' => $productTotalQty ?? 0,
-            ]))"
-            x-init="initSelections()"
-        >
+        <div x-data="productPage(@js([
+    'images' => $product->images
+        ->map(function ($img) {
+            return [
+                'src' => asset('storage/' . $img->image_path),
+                'alt' => $img->alt_text ?? __('product.image_alt'),
+                'colorHex' => $img->color_code ? strtoupper($img->color_code) : null,
+                'isThumb' => (bool) ($img->thumbnail ?? 0),
+            ];
+        })
+        ->values(),
+    'colors' => $product->colors->map(fn($c) => ['id' => $c->id, 'name' => $c->name, 'hex' => strtoupper($c->color_code)])->values(),
+    'sizes' => $product->sizes->map(fn($s) => ['id' => $s->id, 'size' => $s->size])->values(),
+    'stock' => $stockPayload,
+    'prices' => $pricePayload,
+    'productBasePrice' => (float) $product->price,
+    'productBaseDiscount' => $baseDiscount,
+    'productTotalQty' => $productTotalQty ?? 0,
+]))" x-init="initSelections()">
             <div class="grid grid-cols-1 gap-16 lg:gap-8 md:grid-cols-2 place-items-center">
                 <div class="w-full h-full">
-                    <div class="relative w-full h-full rounded-lg overflow-hidden min-h-96 flex justify-center items-center">
+                    <div
+                        class="relative w-full h-full rounded-lg overflow-hidden min-h-96 flex justify-center items-center">
                         <div>
                             <template x-for="(img, i) in displayImages" :key="i">
                                 <div x-show="index === i" x-transition.opacity.duration.300ms
-                                    class="flex items-center justify-center w-fit m-5"
-                                    @mouseenter="hover = true"
-                                    @mouseleave="hover = false; originX = 50; originY = 50"
-                                    @mousemove="onMove($event)"
-                                >
-                                    <img
-                                        :src="img.src"
-                                        :alt="img.alt"
+                                    class="flex items-center justify-center w-fit m-5" @mouseenter="hover = true"
+                                    @mouseleave="hover = false; originX = 50; originY = 50" @mousemove="onMove($event)">
+                                    <img :src="img.src" :alt="img.alt"
                                         class="max-w-full max-h-full object-contain select-none pointer-events-none rounded"
-                                        draggable="false"
-                                        :style="imgStyle(i)"
-                                    >
+                                        draggable="false" :style="imgStyle(i)">
                                 </div>
                             </template>
                         </div>
@@ -177,7 +168,8 @@
                                     </div>
                                 </template>
 
-                                <template x-if="!(priceView().discount !== null && priceView().discount < priceView().price)">
+                                <template
+                                    x-if="!(priceView().discount !== null && priceView().discount < priceView().price)">
                                     <p class="text-2xl font-semibold text-charcoal">
                                         {{ __('product.currency_aed') }}
                                         <span x-text="formatMoney(priceView().price)"></span>
@@ -190,7 +182,8 @@
                             <div class="flex items-baseline gap-2">
                                 <p class="text-2xl font-semibold text-charcoal">
                                     {{ __('product.currency_aed') }}
-                                    <span x-text="`${formatMoney(priceView().min)} – ${formatMoney(priceView().max)}`"></span>
+                                    <span
+                                        x-text="`${formatMoney(priceView().min)} – ${formatMoney(priceView().max)}`"></span>
                                 </p>
                                 <span class="text-xs text-gray-500">(select options)</span>
                             </div>
@@ -216,10 +209,12 @@
                                     <button type="button" @click="selectColor(c)" :disabled="!isColorAvailable(c.hex)"
                                         class="relative inline-flex items-center gap-2 px-3 py-1.5 rounded-full border transition focus:outline-none"
                                         :class="[
-                                            selectedColorHex === c.hex ? 'border-black bg-black text-white' : 'border-gray-300 bg-white',
+                                            selectedColorHex === c.hex ? 'border-black bg-black text-white' :
+                                            'border-gray-300 bg-white',
                                             !isColorAvailable(c.hex) ? 'opacity-40 cursor-not-allowed' : ''
                                         ]">
-                                        <span class="inline-block w-4 h-4 rounded-full border" :style="`background:${c.hex}`"></span>
+                                        <span class="inline-block w-4 h-4 rounded-full border"
+                                            :style="`background:${c.hex}`"></span>
                                         <span class="text-sm" x-text="c.name"></span>
                                     </button>
                                 </template>
@@ -235,7 +230,8 @@
                                     <button type="button" @click="selectSize(s)" :disabled="!isSizeAvailable(s.size)"
                                         class="px-4 py-1.5 rounded-full border transition"
                                         :class="[
-                                            selectedSize === s.size ? 'border-black bg-black text-white' : 'border-gray-300 bg-white',
+                                            selectedSize === s.size ? 'border-black bg-black text-white' :
+                                            'border-gray-300 bg-white',
                                             !isSizeAvailable(s.size) ? 'opacity-40 cursor-not-allowed' : ''
                                         ]">
                                         <span class="text-sm" x-text="s.size"></span>
@@ -261,7 +257,8 @@
                         <input type="hidden" name="size_id" :value="currentSizeId() || ''">
 
                         <div class="mb-4">
-                            <label class="block text-sm font-medium text-gray-700 mb-2">{{ __('product.quantity') }}</label>
+                            <label
+                                class="block text-sm font-medium text-gray-700 mb-2">{{ __('product.quantity') }}</label>
 
                             <div class="flex items-center rounded-md overflow-hidden w-28">
                                 <button type="button" @click="if(qty > 1) qty--" :disabled="qty <= 1"
@@ -280,13 +277,43 @@
 
                             <p class="mt-2 text-xs text-gray-500" x-text="availabilityLabel()"></p>
                         </div>
+                        <div class="flex wrap gap-8">
+                            <button type="submit" :disabled="!canAddToCart()"
+                                class="relative px-6 py-2 text-white rounded-lg transition gap-3 overflow-hidden
+                                       flex items-center justify-start"
+                                :class="canAddToCart() ? 'bg-black group' : 'bg-gray-400 cursor-not-allowed'">
+                                <span
+                                    class="material-icons absolute left-6 transition-all duration-300 ease-in-out
+                                           group-hover:left-1/2 group-hover:-translate-x-1/2">add_shopping_cart</span>
+                                <span
+                                    class="ml-8 transition-all duration-300 ease-in-out
+                                           group-hover:translate-x-4 group-hover:opacity-0">
+                                    {{ __('product.add_to_cart') }}
+                                </span>
+                            </button>
+                            <button type="submit" :disabled="!canAddToCart()"
+                                formaction="{{ route('cart.buy-now', ['id' => $product->id]) }}"
+                                class="relative px-6 py-2 text-white rounded-lg transition overflow-hidden
+                                       flex items-center justify-start"
+                                :class="canAddToCart() ? 'bg-black group' : 'bg-gray-400 cursor-not-allowed'">
 
-                        <button type="submit" :disabled="!canAddToCart()"
-                            class="px-6 py-2 text-white rounded-lg transition flex items-center gap-3"
-                            :class="canAddToCart() ? 'bg-black hover:bg-gray-800' : 'bg-gray-400 cursor-not-allowed'">
-                            <span class="material-icons">add_shopping_cart</span>
-                            {{ __('product.add_to_cart') }}
-                        </button>
+                                <!-- Icon -->
+                                <span
+                                    class="material-symbols-outlined absolute left-6 transition-all duration-300 ease-in-out
+                                           group-hover:left-1/2 group-hover:-translate-x-1/2">
+                                    shopping_bag_speed
+                                </span>
+
+                                <!-- Text -->
+                                <span
+                                    class="ml-8 transition-all duration-300 ease-in-out
+                                           group-hover:translate-x-4 group-hover:opacity-0">
+                                    Buy Now
+                                </span>
+
+                            </button>
+
+                        </div>
                     </form>
                 </div>
             </div>
@@ -300,9 +327,11 @@
 
                 <div class="flex flex-wrap gap-5 m-5">
                     @foreach ($smiliarProducts as $sp)
-                        <div class="overflow-hidden !transition bg-white rounded-lg shadow-md !duration-500 hover:shadow-2xl fade-up w-[250px]">
+                        <div
+                            class="overflow-hidden !transition bg-white rounded-lg shadow-md !duration-500 hover:shadow-2xl fade-up w-[250px]">
                             @if ($sp->images->count())
-                                <div class="relative flex justify-center items-center w-full h-[300px] overflow-hidden rounded-t-md p-1">
+                                <div
+                                    class="relative flex justify-center items-center w-full h-[300px] overflow-hidden rounded-t-md p-1">
                                     <img class="h-full object-contain cursor-zoom-in rounded-md"
                                         alt="{{ $sp->name }}"
                                         src="{{ asset('storage/' . $sp->images->first()->image_path) }}"
@@ -353,9 +382,9 @@
                 prices: Array.isArray(init.prices) ? init.prices : [],
 
                 productBasePrice: Number(init.productBasePrice ?? 0),
-                productBaseDiscount: (init.productBaseDiscount === null || init.productBaseDiscount === undefined || Number(init.productBaseDiscount) <= 0)
-                    ? null
-                    : Number(init.productBaseDiscount),
+                productBaseDiscount: (init.productBaseDiscount === null || init.productBaseDiscount === undefined || Number(
+                        init.productBaseDiscount) <= 0) ?
+                    null : Number(init.productBaseDiscount),
                 productTotalQty: Number.isFinite(init.productTotalQty) ? init.productTotalQty : 0,
 
                 selectedColorHex: null,
@@ -372,8 +401,12 @@
 
                 priceIndex: {},
 
-                hasColorOptions() { return this.colors.length > 0 },
-                hasSizeOptions() { return this.sizes.length > 0 },
+                hasColorOptions() {
+                    return this.colors.length > 0
+                },
+                hasSizeOptions() {
+                    return this.sizes.length > 0
+                },
 
                 isSelectionComplete() {
                     const needColor = this.hasColorOptions() && !this.selectedColorHex;
@@ -400,10 +433,11 @@
                         idx[key] = {
                             colorId: this.normId(p.colorId ?? null),
                             sizeId: this.normId(p.sizeId ?? null),
-                            price: (p.price !== null && p.price !== undefined && Number(p.price) > 0) ? Number(p.price) : null,
-                            discounted_price: (p.discounted_price !== null && p.discounted_price !== undefined && Number(p.discounted_price) > 0)
-                                ? Number(p.discounted_price)
-                                : null,
+                            price: (p.price !== null && p.price !== undefined && Number(p.price) > 0) ? Number(p
+                                .price) : null,
+                            discounted_price: (p.discounted_price !== null && p.discounted_price !== undefined &&
+                                    Number(p.discounted_price) > 0) ?
+                                Number(p.discounted_price) : null,
                         };
                     }
                     this.priceIndex = idx;
@@ -413,7 +447,8 @@
                     let imgs = this.images;
 
                     if (this.selectedColorHex) {
-                        imgs = imgs.filter(img => (img.colorHex || null) === this.selectedColorHex || img.colorHex == null);
+                        imgs = imgs.filter(img => (img.colorHex || null) === this.selectedColorHex || img.colorHex ==
+                            null);
                     }
 
                     const thumbs = imgs.filter(i => i.isThumb);
@@ -452,14 +487,16 @@
                 },
 
                 qtyFor(colorHex, size) {
-                    const row = this.stock.find(r => (r.colorHex || null) === (colorHex || null) && (r.size || null) === (size || null));
+                    const row = this.stock.find(r => (r.colorHex || null) === (colorHex || null) && (r.size || null) === (
+                        size || null));
                     return row ? Math.max(0, parseInt(row.qty, 10) || 0) : 0;
                 },
 
                 currentVariantId() {
                     if (this.hasColorOptions() && this.hasSizeOptions()) {
                         if (!this.selectedColorHex || !this.selectedSize) return null;
-                        const row = this.stock.find(r => r.colorHex === this.selectedColorHex && r.size === this.selectedSize);
+                        const row = this.stock.find(r => r.colorHex === this.selectedColorHex && r.size === this
+                            .selectedSize);
                         return row ? row.id : null;
                     }
                     if (this.hasColorOptions() && !this.hasSizeOptions()) {
@@ -550,38 +587,54 @@
 
                 effectiveForVariant(colorId, sizeId) {
                     const basePrice = Number(this.productBasePrice || 0);
-                    const baseDiscount = (this.productBaseDiscount !== null && Number(this.productBaseDiscount) > 0)
-                        ? Number(this.productBaseDiscount)
-                        : null;
+                    const baseDiscount = (this.productBaseDiscount !== null && Number(this.productBaseDiscount) > 0) ?
+                        Number(this.productBaseDiscount) :
+                        null;
 
                     const row = this.priceRowFor(colorId, sizeId);
 
                     if (row) {
                         const price = (row.price !== null && Number(row.price) > 0) ? Number(row.price) : basePrice;
-                        const discount = (row.discounted_price !== null && Number(row.discounted_price) > 0) ? Number(row.discounted_price) : null;
+                        const discount = (row.discounted_price !== null && Number(row.discounted_price) > 0) ? Number(row
+                            .discounted_price) : null;
                         const effective = (discount !== null && discount < price) ? discount : price;
 
-                        return { price, discount, effective, hasVariant: true };
+                        return {
+                            price,
+                            discount,
+                            effective,
+                            hasVariant: true
+                        };
                     }
 
                     const price = basePrice;
                     const discount = baseDiscount;
                     const effective = (discount !== null && discount < price) ? discount : price;
 
-                    return { price, discount, effective, hasVariant: false };
+                    return {
+                        price,
+                        discount,
+                        effective,
+                        hasVariant: false
+                    };
                 },
 
                 inStockVariantPairsFiltered() {
                     const pairs = this.stock
                         .filter(r => (Number(r.qty) || 0) > 0)
-                        .map(r => ({ colorId: this.normId(r.colorId ?? null), sizeId: this.normId(r.sizeId ?? null) }));
+                        .map(r => ({
+                            colorId: this.normId(r.colorId ?? null),
+                            sizeId: this.normId(r.sizeId ?? null)
+                        }));
 
                     const selectedColorId = this.currentColorId();
                     const selectedSizeId = this.currentSizeId();
 
                     return pairs.filter(p => {
-                        if (this.hasColorOptions() && selectedColorId !== null && (p.colorId ?? null) !== selectedColorId) return false;
-                        if (this.hasSizeOptions() && selectedSizeId !== null && (p.sizeId ?? null) !== selectedSizeId) return false;
+                        if (this.hasColorOptions() && selectedColorId !== null && (p.colorId ?? null) !==
+                            selectedColorId) return false;
+                        if (this.hasSizeOptions() && selectedSizeId !== null && (p.sizeId ?? null) !==
+                            selectedSizeId) return false;
                         return true;
                     });
                 },
@@ -590,7 +643,8 @@
                     const pairs = this.inStockVariantPairsFiltered();
                     if (!pairs.length) return null;
 
-                    let min = Infinity, max = -Infinity;
+                    let min = Infinity,
+                        max = -Infinity;
                     let variantAware = false;
 
                     for (const p of pairs) {
@@ -604,7 +658,11 @@
                     }
 
                     if (!Number.isFinite(min) || !Number.isFinite(max)) return null;
-                    return { min, max, variantAware };
+                    return {
+                        min,
+                        max,
+                        variantAware
+                    };
                 },
 
                 priceView() {
@@ -641,9 +699,9 @@
                     }
 
                     const basePrice = Number(this.productBasePrice || 0);
-                    const baseDiscount = (this.productBaseDiscount !== null && Number(this.productBaseDiscount) > 0)
-                        ? Number(this.productBaseDiscount)
-                        : null;
+                    const baseDiscount = (this.productBaseDiscount !== null && Number(this.productBaseDiscount) > 0) ?
+                        Number(this.productBaseDiscount) :
+                        null;
 
                     return {
                         mode: 'single',

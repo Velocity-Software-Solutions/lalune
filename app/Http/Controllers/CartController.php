@@ -16,193 +16,377 @@ class CartController extends Controller
         return view('cart.index');
     }
 
-public function add(Request $request, $id)
-{
-    /*
-    Add-to-cart notes (kept ONLY here at the top):
-    - Uses variant-aware pricing from prices relation when available (color_id/size_id match).
-      If a prices-row exists for the chosen variant, base discount is ignored.
-    - discounted_price is ignored when null/<=0, and only applied if < price.
-    - Stock enforcement:
-      If variants exist (colors/sizes), we enforce variant stock row.
-      Otherwise, we enforce product-level stock_quantity.
-      We also respect already-in-cart quantity for the same cart key.
-    - Cart key is stable and based on IDs: product|colorId|sizeId
-    */
+    public function add(Request $request, $id)
+    {
+        /*
+        Add-to-cart notes (kept ONLY here at the top):
+        - Uses variant-aware pricing from prices relation when available (color_id/size_id match).
+          If a prices-row exists for the chosen variant, base discount is ignored.
+        - discounted_price is ignored when null/<=0, and only applied if < price.
+        - Stock enforcement:
+          If variants exist (colors/sizes), we enforce variant stock row.
+          Otherwise, we enforce product-level stock_quantity.
+          We also respect already-in-cart quantity for the same cart key.
+        - Cart key is stable and based on IDs: product|colorId|sizeId
+        */
 
-    $product = Product::with(['colors', 'sizes', 'stock', 'images', 'prices'])->findOrFail($id);
+        $product = Product::with(['colors', 'sizes', 'stock', 'images', 'prices'])->findOrFail($id);
 
-    $colorIdIn = $request->filled('color_id') ? (int) $request->input('color_id') : null;
-    $sizeIdIn  = $request->filled('size_id')  ? (int) $request->input('size_id')  : null;
+        $colorIdIn = $request->filled('color_id') ? (int) $request->input('color_id') : null;
+        $sizeIdIn = $request->filled('size_id') ? (int) $request->input('size_id') : null;
 
-    $selectedColorHex = trim((string) $request->input('color_code', ''));
-    $selectedColorHex = $selectedColorHex !== '' ? strtoupper($selectedColorHex) : null;
+        $selectedColorHex = trim((string) $request->input('color_code', ''));
+        $selectedColorHex = $selectedColorHex !== '' ? strtoupper($selectedColorHex) : null;
 
-    $selectedSizeStr = trim((string) $request->input('size', ''));
-    $selectedSizeStr = $selectedSizeStr !== '' ? $selectedSizeStr : null;
+        $selectedSizeStr = trim((string) $request->input('size', ''));
+        $selectedSizeStr = $selectedSizeStr !== '' ? $selectedSizeStr : null;
 
-    $requestedQty = max(1, (int) $request->input('quantity', 1));
+        $requestedQty = max(1, (int) $request->input('quantity', 1));
 
-    $hasColors = $product->colors->isNotEmpty();
-    $hasSizes  = $product->sizes->isNotEmpty();
+        $hasColors = $product->colors->isNotEmpty();
+        $hasSizes = $product->sizes->isNotEmpty();
 
-    if ($hasColors && !$colorIdIn && !$selectedColorHex) {
-        return back()->withErrors(['color_code' => 'Please choose a color.']);
-    }
-    if ($hasSizes && !$sizeIdIn && !$selectedSizeStr) {
-        return back()->withErrors(['size' => 'Please choose a size.']);
-    }
+        if ($hasColors && !$colorIdIn && !$selectedColorHex) {
+            return back()->withErrors(['color_code' => 'Please choose a color.']);
+        }
+        if ($hasSizes && !$sizeIdIn && !$selectedSizeStr) {
+            return back()->withErrors(['size' => 'Please choose a size.']);
+        }
 
-    $colorId = null;
-    if ($hasColors) {
-        if ($colorIdIn) {
-            if (!$product->colors->contains('id', $colorIdIn)) {
-                return back()->withErrors(['color_code' => 'Selected color is not available for this product.']);
-            }
-            $colorId = $colorIdIn;
-        } elseif ($selectedColorHex) {
-            $colorId = optional($product->colors->firstWhere('color_code', strtoupper($selectedColorHex)))->id;
-            if (!$colorId) {
-                return back()->withErrors(['color_code' => 'Selected color is not available for this product.']);
+        $colorId = null;
+        if ($hasColors) {
+            if ($colorIdIn) {
+                if (!$product->colors->contains('id', $colorIdIn)) {
+                    return back()->withErrors(['color_code' => 'Selected color is not available for this product.']);
+                }
+                $colorId = $colorIdIn;
+            } elseif ($selectedColorHex) {
+                $colorId = optional($product->colors->firstWhere('color_code', strtoupper($selectedColorHex)))->id;
+                if (!$colorId) {
+                    return back()->withErrors(['color_code' => 'Selected color is not available for this product.']);
+                }
             }
         }
-    }
 
-    $sizeId = null;
-    if ($hasSizes) {
-        if ($sizeIdIn) {
-            if (!$product->sizes->contains('id', $sizeIdIn)) {
-                return back()->withErrors(['size' => 'Selected size is not available for this product.']);
-            }
-            $sizeId = $sizeIdIn;
-        } elseif ($selectedSizeStr) {
-            $sizeId = optional($product->sizes->firstWhere('size', $selectedSizeStr))->id;
-            if (!$sizeId) {
-                return back()->withErrors(['size' => 'Selected size is not available for this product.']);
+        $sizeId = null;
+        if ($hasSizes) {
+            if ($sizeIdIn) {
+                if (!$product->sizes->contains('id', $sizeIdIn)) {
+                    return back()->withErrors(['size' => 'Selected size is not available for this product.']);
+                }
+                $sizeId = $sizeIdIn;
+            } elseif ($selectedSizeStr) {
+                $sizeId = optional($product->sizes->firstWhere('size', $selectedSizeStr))->id;
+                if (!$sizeId) {
+                    return back()->withErrors(['size' => 'Selected size is not available for this product.']);
+                }
             }
         }
-    }
 
-    $resolvedColorHex = $selectedColorHex ?: optional($product->colors->firstWhere('id', $colorId))->color_code;
-    $resolvedColorHex = $resolvedColorHex ? strtoupper($resolvedColorHex) : null;
+        $resolvedColorHex = $selectedColorHex ?: optional($product->colors->firstWhere('id', $colorId))->color_code;
+        $resolvedColorHex = $resolvedColorHex ? strtoupper($resolvedColorHex) : null;
 
-    $resolvedSizeStr = $selectedSizeStr ?: optional($product->sizes->firstWhere('id', $sizeId))->size;
+        $resolvedSizeStr = $selectedSizeStr ?: optional($product->sizes->firstWhere('id', $sizeId))->size;
 
-    $variant = null;
-    if ($hasColors || $hasSizes) {
-        $variant = $product->stock->first(function ($row) use ($colorId, $sizeId, $hasColors, $hasSizes) {
-            $colorMatch = $hasColors ? ((int) $row->color_id === (int) $colorId) : is_null($row->color_id);
-            $sizeMatch  = $hasSizes  ? ((int) $row->size_id  === (int) $sizeId)  : is_null($row->size_id);
-            return $colorMatch && $sizeMatch;
-        });
+        $variant = null;
+        if ($hasColors || $hasSizes) {
+            $variant = $product->stock->first(function ($row) use ($colorId, $sizeId, $hasColors, $hasSizes) {
+                $colorMatch = $hasColors ? ((int) $row->color_id === (int) $colorId) : is_null($row->color_id);
+                $sizeMatch = $hasSizes ? ((int) $row->size_id === (int) $sizeId) : is_null($row->size_id);
+                return $colorMatch && $sizeMatch;
+            });
 
-        if (!$variant) {
-            return back()->withErrors(['quantity' => 'Sorry, this option combination is unavailable.']);
+            if (!$variant) {
+                return back()->withErrors(['quantity' => 'Sorry, this option combination is unavailable.']);
+            }
         }
-    }
 
-    $available = 0;
-    if ($variant) {
-        $available = (int) ($variant->available_qty ?? $variant->quantity_on_hand ?? 0);
-    } else {
-        $available = (int) ($product->stock_quantity ?? 0);
-    }
+        $available = 0;
+        if ($variant) {
+            $available = (int) ($variant->available_qty ?? $variant->quantity_on_hand ?? 0);
+        } else {
+            $available = (int) ($product->stock_quantity ?? 0);
+        }
 
-    $cartKey = $id . '|' . ($colorId ?: 'any') . '|' . ($sizeId ?: 'any');
+        $cartKey = $id . '|' . ($colorId ?: 'any') . '|' . ($sizeId ?: 'any');
 
-    $cart = session()->get('cart', []);
-    $alreadyInCart = isset($cart[$cartKey]) ? (int) $cart[$cartKey]['quantity'] : 0;
+        $cart = session()->get('cart', []);
+        $alreadyInCart = isset($cart[$cartKey]) ? (int) $cart[$cartKey]['quantity'] : 0;
 
-    $canStillAdd = max(0, $available - $alreadyInCart);
-    if ($canStillAdd <= 0) {
-        return back()->withErrors(['quantity' => 'This selection is out of stock or already at the limit in your cart.']);
-    }
+        $canStillAdd = max(0, $available - $alreadyInCart);
+        if ($canStillAdd <= 0) {
+            return back()->withErrors(['quantity' => 'This selection is out of stock or already at the limit in your cart.']);
+        }
 
-    $willAdd = min($requestedQty, $canStillAdd);
+        $willAdd = min($requestedQty, $canStillAdd);
 
-    $basePrice = (float) ($product->price ?? 0);
-    $baseDiscount = ($product->discount_price !== null && (float) $product->discount_price > 0)
-        ? (float) $product->discount_price
-        : null;
-
-    $priceRow = null;
-    if ($product->relationLoaded('prices')) {
-        $priceRow = $product->prices->first(function ($row) use ($colorId, $sizeId) {
-            $c1 = is_null($row->color_id) ? null : (int) $row->color_id;
-            $s1 = is_null($row->size_id) ? null : (int) $row->size_id;
-            $c2 = is_null($colorId) ? null : (int) $colorId;
-            $s2 = is_null($sizeId) ? null : (int) $sizeId;
-            return $c1 === $c2 && $s1 === $s2;
-        });
-    }
-
-    if ($priceRow) {
-        $rowPrice = ($priceRow->price !== null && (float) $priceRow->price > 0) ? (float) $priceRow->price : $basePrice;
-        $rowDiscount = ($priceRow->discounted_price !== null && (float) $priceRow->discounted_price > 0)
-            ? (float) $priceRow->discounted_price
+        $basePrice = (float) ($product->price ?? 0);
+        $baseDiscount = ($product->discount_price !== null && (float) $product->discount_price > 0)
+            ? (float) $product->discount_price
             : null;
 
-        $unitPrice = ($rowDiscount !== null && $rowDiscount < $rowPrice) ? $rowDiscount : $rowPrice;
-        $originalPrice = $rowPrice;
-        $appliedDiscount = ($rowDiscount !== null && $rowDiscount < $rowPrice) ? $rowDiscount : null;
-    } else {
-        $unitPrice = ($baseDiscount !== null && $baseDiscount < $basePrice) ? $baseDiscount : $basePrice;
-        $originalPrice = $basePrice;
-        $appliedDiscount = ($baseDiscount !== null && $baseDiscount < $basePrice) ? $baseDiscount : null;
-    }
-
-    $thumbnail = null;
-    if ($resolvedColorHex) {
-        $thumbnail = $product->images->firstWhere('color_code', $resolvedColorHex);
-    }
-    if (!$thumbnail) {
-        $thumbnail = $product->images->firstWhere('thumbnail', true) ?? $product->images->first();
-    }
-
-    if (isset($cart[$cartKey])) {
-        $cart[$cartKey]['quantity'] += $willAdd;
-        $cart[$cartKey]['price'] = $unitPrice;
-        $cart[$cartKey]['original_price'] = $originalPrice;
-        $cart[$cartKey]['discount_price'] = $appliedDiscount;
-        $cart[$cartKey]['image_path'] = $thumbnail?->image_path;
-        $cart[$cartKey]['color_id'] = $colorId;
-        $cart[$cartKey]['size_id'] = $sizeId;
-        $cart[$cartKey]['color'] = $resolvedColorHex;
-        $cart[$cartKey]['size'] = $resolvedSizeStr;
-        if ($variant && empty($cart[$cartKey]['product_stock_id'])) {
-            $cart[$cartKey]['product_stock_id'] = $variant->id;
+        $priceRow = null;
+        if ($product->relationLoaded('prices')) {
+            $priceRow = $product->prices->first(function ($row) use ($colorId, $sizeId) {
+                $c1 = is_null($row->color_id) ? null : (int) $row->color_id;
+                $s1 = is_null($row->size_id) ? null : (int) $row->size_id;
+                $c2 = is_null($colorId) ? null : (int) $colorId;
+                $s2 = is_null($sizeId) ? null : (int) $sizeId;
+                return $c1 === $c2 && $s1 === $s2;
+            });
         }
-    } else {
-        $cart[$cartKey] = [
-            'product_id' => $product->id,
-            'name' => $product->name,
-            'price' => $unitPrice,
-            'original_price' => $originalPrice,
-            'discount_price' => $appliedDiscount,
-            'image_path' => $thumbnail?->image_path,
-            'quantity' => $willAdd,
-            'color_id' => $colorId,
-            'size_id' => $sizeId,
-            'color' => $resolvedColorHex,
-            'size' => $resolvedSizeStr,
-            'product_stock_id' => $variant->id ?? null,
-        ];
-    }
 
-    session()->put('cart', $cart);
+        if ($priceRow) {
+            $rowPrice = ($priceRow->price !== null && (float) $priceRow->price > 0) ? (float) $priceRow->price : $basePrice;
+            $rowDiscount = ($priceRow->discounted_price !== null && (float) $priceRow->discounted_price > 0)
+                ? (float) $priceRow->discounted_price
+                : null;
 
-    if ($willAdd < $requestedQty) {
+            $unitPrice = ($rowDiscount !== null && $rowDiscount < $rowPrice) ? $rowDiscount : $rowPrice;
+            $originalPrice = $rowPrice;
+            $appliedDiscount = ($rowDiscount !== null && $rowDiscount < $rowPrice) ? $rowDiscount : null;
+        } else {
+            $unitPrice = ($baseDiscount !== null && $baseDiscount < $basePrice) ? $baseDiscount : $basePrice;
+            $originalPrice = $basePrice;
+            $appliedDiscount = ($baseDiscount !== null && $baseDiscount < $basePrice) ? $baseDiscount : null;
+        }
+
+        $thumbnail = null;
+        if ($resolvedColorHex) {
+            $thumbnail = $product->images->firstWhere('color_code', $resolvedColorHex);
+        }
+        if (!$thumbnail) {
+            $thumbnail = $product->images->firstWhere('thumbnail', true) ?? $product->images->first();
+        }
+
+        if (isset($cart[$cartKey])) {
+            $cart[$cartKey]['quantity'] += $willAdd;
+            $cart[$cartKey]['price'] = $unitPrice;
+            $cart[$cartKey]['original_price'] = $originalPrice;
+            $cart[$cartKey]['discount_price'] = $appliedDiscount;
+            $cart[$cartKey]['image_path'] = $thumbnail?->image_path;
+            $cart[$cartKey]['color_id'] = $colorId;
+            $cart[$cartKey]['size_id'] = $sizeId;
+            $cart[$cartKey]['color'] = $resolvedColorHex;
+            $cart[$cartKey]['size'] = $resolvedSizeStr;
+            if ($variant && empty($cart[$cartKey]['product_stock_id'])) {
+                $cart[$cartKey]['product_stock_id'] = $variant->id;
+            }
+        } else {
+            $cart[$cartKey] = [
+                'product_id' => $product->id,
+                'name' => $product->name,
+                'price' => $unitPrice,
+                'original_price' => $originalPrice,
+                'discount_price' => $appliedDiscount,
+                'image_path' => $thumbnail?->image_path,
+                'quantity' => $willAdd,
+                'color_id' => $colorId,
+                'size_id' => $sizeId,
+                'color' => $resolvedColorHex,
+                'size' => $resolvedSizeStr,
+                'product_stock_id' => $variant->id ?? null,
+            ];
+        }
+
+        session()->put('cart', $cart);
+
+        if ($willAdd < $requestedQty) {
+            return redirect()
+                ->route('home')
+                ->with('warning', "Only {$canStillAdd} in stock for this selection. Added {$willAdd} to your cart.");
+        }
+
         return redirect()
-            ->route('cart.index')
-            ->with('warning', "Only {$canStillAdd} in stock for this selection. Added {$willAdd} to your cart.");
+            ->route('home')
+            ->with('success', 'Product added to cart!');
     }
 
-    return redirect()
-        ->route('cart.index')
-        ->with('success', 'Product added to cart!');
-}
+    public function buyNow(Request $request, $id)
+    {
+        /*
+        Add-to-cart notes (kept ONLY here at the top):
+        - Uses variant-aware pricing from prices relation when available (color_id/size_id match).
+          If a prices-row exists for the chosen variant, base discount is ignored.
+        - discounted_price is ignored when null/<=0, and only applied if < price.
+        - Stock enforcement:
+          If variants exist (colors/sizes), we enforce variant stock row.
+          Otherwise, we enforce product-level stock_quantity.
+          We also respect already-in-cart quantity for the same cart key.
+        - Cart key is stable and based on IDs: product|colorId|sizeId
+        */
 
+        $product = Product::with(['colors', 'sizes', 'stock', 'images', 'prices'])->findOrFail($id);
 
+        $colorIdIn = $request->filled('color_id') ? (int) $request->input('color_id') : null;
+        $sizeIdIn = $request->filled('size_id') ? (int) $request->input('size_id') : null;
+
+        $selectedColorHex = trim((string) $request->input('color_code', ''));
+        $selectedColorHex = $selectedColorHex !== '' ? strtoupper($selectedColorHex) : null;
+
+        $selectedSizeStr = trim((string) $request->input('size', ''));
+        $selectedSizeStr = $selectedSizeStr !== '' ? $selectedSizeStr : null;
+
+        $requestedQty = max(1, (int) $request->input('quantity', 1));
+
+        $hasColors = $product->colors->isNotEmpty();
+        $hasSizes = $product->sizes->isNotEmpty();
+
+        if ($hasColors && !$colorIdIn && !$selectedColorHex) {
+            return back()->withErrors(['color_code' => 'Please choose a color.']);
+        }
+        if ($hasSizes && !$sizeIdIn && !$selectedSizeStr) {
+            return back()->withErrors(['size' => 'Please choose a size.']);
+        }
+
+        $colorId = null;
+        if ($hasColors) {
+            if ($colorIdIn) {
+                if (!$product->colors->contains('id', $colorIdIn)) {
+                    return back()->withErrors(['color_code' => 'Selected color is not available for this product.']);
+                }
+                $colorId = $colorIdIn;
+            } elseif ($selectedColorHex) {
+                $colorId = optional($product->colors->firstWhere('color_code', strtoupper($selectedColorHex)))->id;
+                if (!$colorId) {
+                    return back()->withErrors(['color_code' => 'Selected color is not available for this product.']);
+                }
+            }
+        }
+
+        $sizeId = null;
+        if ($hasSizes) {
+            if ($sizeIdIn) {
+                if (!$product->sizes->contains('id', $sizeIdIn)) {
+                    return back()->withErrors(['size' => 'Selected size is not available for this product.']);
+                }
+                $sizeId = $sizeIdIn;
+            } elseif ($selectedSizeStr) {
+                $sizeId = optional($product->sizes->firstWhere('size', $selectedSizeStr))->id;
+                if (!$sizeId) {
+                    return back()->withErrors(['size' => 'Selected size is not available for this product.']);
+                }
+            }
+        }
+
+        $resolvedColorHex = $selectedColorHex ?: optional($product->colors->firstWhere('id', $colorId))->color_code;
+        $resolvedColorHex = $resolvedColorHex ? strtoupper($resolvedColorHex) : null;
+
+        $resolvedSizeStr = $selectedSizeStr ?: optional($product->sizes->firstWhere('id', $sizeId))->size;
+
+        $variant = null;
+        if ($hasColors || $hasSizes) {
+            $variant = $product->stock->first(function ($row) use ($colorId, $sizeId, $hasColors, $hasSizes) {
+                $colorMatch = $hasColors ? ((int) $row->color_id === (int) $colorId) : is_null($row->color_id);
+                $sizeMatch = $hasSizes ? ((int) $row->size_id === (int) $sizeId) : is_null($row->size_id);
+                return $colorMatch && $sizeMatch;
+            });
+
+            if (!$variant) {
+                return back()->withErrors(['quantity' => 'Sorry, this option combination is unavailable.']);
+            }
+        }
+
+        $available = 0;
+        if ($variant) {
+            $available = (int) ($variant->available_qty ?? $variant->quantity_on_hand ?? 0);
+        } else {
+            $available = (int) ($product->stock_quantity ?? 0);
+        }
+
+        $cartKey = $id . '|' . ($colorId ?: 'any') . '|' . ($sizeId ?: 'any');
+
+        $cart = session()->get('cart', []);
+        $alreadyInCart = isset($cart[$cartKey]) ? (int) $cart[$cartKey]['quantity'] : 0;
+
+        $canStillAdd = max(0, $available - $alreadyInCart);
+        if ($canStillAdd <= 0) {
+            return back()->withErrors(['quantity' => 'This selection is out of stock or already at the limit in your cart.']);
+        }
+
+        $willAdd = min($requestedQty, $canStillAdd);
+
+        $basePrice = (float) ($product->price ?? 0);
+        $baseDiscount = ($product->discount_price !== null && (float) $product->discount_price > 0)
+            ? (float) $product->discount_price
+            : null;
+
+        $priceRow = null;
+        if ($product->relationLoaded('prices')) {
+            $priceRow = $product->prices->first(function ($row) use ($colorId, $sizeId) {
+                $c1 = is_null($row->color_id) ? null : (int) $row->color_id;
+                $s1 = is_null($row->size_id) ? null : (int) $row->size_id;
+                $c2 = is_null($colorId) ? null : (int) $colorId;
+                $s2 = is_null($sizeId) ? null : (int) $sizeId;
+                return $c1 === $c2 && $s1 === $s2;
+            });
+        }
+
+        if ($priceRow) {
+            $rowPrice = ($priceRow->price !== null && (float) $priceRow->price > 0) ? (float) $priceRow->price : $basePrice;
+            $rowDiscount = ($priceRow->discounted_price !== null && (float) $priceRow->discounted_price > 0)
+                ? (float) $priceRow->discounted_price
+                : null;
+
+            $unitPrice = ($rowDiscount !== null && $rowDiscount < $rowPrice) ? $rowDiscount : $rowPrice;
+            $originalPrice = $rowPrice;
+            $appliedDiscount = ($rowDiscount !== null && $rowDiscount < $rowPrice) ? $rowDiscount : null;
+        } else {
+            $unitPrice = ($baseDiscount !== null && $baseDiscount < $basePrice) ? $baseDiscount : $basePrice;
+            $originalPrice = $basePrice;
+            $appliedDiscount = ($baseDiscount !== null && $baseDiscount < $basePrice) ? $baseDiscount : null;
+        }
+
+        $thumbnail = null;
+        if ($resolvedColorHex) {
+            $thumbnail = $product->images->firstWhere('color_code', $resolvedColorHex);
+        }
+        if (!$thumbnail) {
+            $thumbnail = $product->images->firstWhere('thumbnail', true) ?? $product->images->first();
+        }
+
+        if (isset($cart[$cartKey])) {
+            $cart[$cartKey]['quantity'] += $willAdd;
+            $cart[$cartKey]['price'] = $unitPrice;
+            $cart[$cartKey]['original_price'] = $originalPrice;
+            $cart[$cartKey]['discount_price'] = $appliedDiscount;
+            $cart[$cartKey]['image_path'] = $thumbnail?->image_path;
+            $cart[$cartKey]['color_id'] = $colorId;
+            $cart[$cartKey]['size_id'] = $sizeId;
+            $cart[$cartKey]['color'] = $resolvedColorHex;
+            $cart[$cartKey]['size'] = $resolvedSizeStr;
+            if ($variant && empty($cart[$cartKey]['product_stock_id'])) {
+                $cart[$cartKey]['product_stock_id'] = $variant->id;
+            }
+        } else {
+            $cart[$cartKey] = [
+                'product_id' => $product->id,
+                'name' => $product->name,
+                'price' => $unitPrice,
+                'original_price' => $originalPrice,
+                'discount_price' => $appliedDiscount,
+                'image_path' => $thumbnail?->image_path,
+                'quantity' => $willAdd,
+                'color_id' => $colorId,
+                'size_id' => $sizeId,
+                'color' => $resolvedColorHex,
+                'size' => $resolvedSizeStr,
+                'product_stock_id' => $variant->id ?? null,
+            ];
+        }
+
+        session()->put('cart', $cart);
+
+        if ($willAdd < $requestedQty) {
+            return redirect()
+                ->route('checkout.index')
+                ->with('warning', "Only {$canStillAdd} in stock for this selection. Added {$willAdd} to your cart.");
+        }
+
+        return redirect()
+            ->route('checkout.index')
+            ->with('success', 'Product added to cart!');
+    }
 
     public function update(Request $request, $cartKey)
     {
@@ -213,7 +397,7 @@ public function add(Request $request, $id)
             session()->put('cart', $cart);
         }
 
-        return redirect()->route('cart.index');
+        return redirect()->route('home');
     }
 
 
@@ -224,7 +408,7 @@ public function add(Request $request, $id)
             unset($cart[$id]);
             session()->put('cart', $cart);
         }
-        return redirect()->route('cart.index');
+        return redirect()->route('home');
     }
 
     public function applyPromo(Request $request)

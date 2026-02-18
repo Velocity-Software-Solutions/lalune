@@ -49,7 +49,7 @@
         $grandTotal = $baseTotalAfterDiscount + $taxAmount + $shippingAfter;
     @endphp
 
-    <div class="max-w-4xl px-4 py-10 mx-auto sm:px-6 lg:px-8 min-h-screen bg-white" x-data="checkoutState({
+    <div class="max-w-5xl px-4 py-10 mx-auto sm:px-6 lg:px-8 min-h-screen bg-white" x-data="checkoutState({
         countries: {{ Js::from($countries) }},
         shippingOptions: {{ Js::from($shippingOptions) }},
         currency: 'CAD',
@@ -71,7 +71,6 @@
 
 
 
-        {{-- Cart Items --}}
         {{-- Cart Items --}}
         <div class="p-6 mb-6 bg-white rounded-lg shadow border border-white/60">
             <h2 class="mb-4 text-xl font-semibold text-black">{{ __('checkout.your_cart') }}</h2>
@@ -184,6 +183,103 @@
                 </ul>
             </div>
         @endif
+
+
+        {{-- Promo Codes (Apply + List/Remove) --}}
+        <div class="p-6 mb-6 bg-white rounded-lg shadow border border-white/60">
+            <div class="flex items-center justify-between gap-3">
+                <h2 class="text-xl font-semibold text-black">Promo Codes</h2>
+                <span class="text-xs text-gray-500">Free shipping or discounts</span>
+            </div>
+
+            {{-- Apply promo --}}
+            <form action="{{ route('cart.applyPromo') }}" method="POST" class="mt-4 flex flex-col sm:flex-row gap-3">
+                @csrf
+                <div class="flex-1">
+                    <label for="promo_code" class="block text-sm font-medium text-charcoal">
+                        Have a promo?
+                    </label>
+                    <input id="promo_code" type="text" name="promo_code" value="{{ old('promo_code') }}"
+                        placeholder="Enter promo code" autocomplete="off"
+                        class="w-full mt-1 rounded-md border border-primary/30 bg-white text-charcoal shadow-sm
+                       focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary">
+                    @error('promo_code')
+                        <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                <div class="sm:pt-6">
+                    <button type="submit"
+                        class="w-full sm:w-auto px-5 py-2.5 rounded-md text-white bg-gray-700
+                       hover:bg-gray-700/90 focus:outline-none focus:ring-2 focus:ring-black/40 transition">
+                        Apply
+                    </button>
+                </div>
+            </form>
+
+            {{-- Applied promos list --}}
+            @php
+                $promos = collect(session('promos', []));
+            @endphp
+
+            @if ($promos->isNotEmpty())
+                <div class="mt-5 space-y-3">
+                    <p class="text-sm text-charcoal/70">Applied promotions:</p>
+
+                    @foreach ($promos as $promo)
+                        @php
+                            $type = $promo['discount_type'] ?? '';
+                            $code = strtoupper($promo['code'] ?? '');
+                        @endphp
+
+                        <div
+                            class="flex items-center justify-between gap-3 p-3 rounded-lg border border-primary/10 bg-white">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                @if ($type === 'shipping')
+                                    <span
+                                        class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
+                                        Free Shipping
+                                    </span>
+                                @elseif($type === 'percentage')
+                                    <span
+                                        class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800">
+                                        {{ (int) ($promo['percent'] ?? ($promo['value'] ?? 0)) }}% Off
+                                    </span>
+                                @elseif($type === 'fixed')
+                                    <span
+                                        class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800">
+                                        Amount Off
+                                    </span>
+                                @else
+                                    <span
+                                        class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700">
+                                        Promo
+                                    </span>
+                                @endif
+
+                                <span class="text-sm text-gray-700">
+                                    Code: <span class="font-mono font-semibold">{{ $code }}</span>
+                                </span>
+                            </div>
+
+                            <form method="POST" action="{{ route('cart.removePromo', $promo['code']) }}">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit"
+                                    class="text-xs text-gray-600 hover:text-black underline underline-offset-4">
+                                    Remove
+                                </button>
+                            </form>
+                        </div>
+                    @endforeach
+                </div>
+            @else
+                <div class="mt-4 text-sm text-charcoal/70">
+                    No promo applied yet. Enter a code above.
+                </div>
+            @endif
+        </div>
+
 
         {{-- Checkout Form --}}
         <form method="POST" action="{{ route('checkout.process') }}" class="space-y-4">

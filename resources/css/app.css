@@ -11,6 +11,10 @@ ol, ul {
   list-style: revert;
 }
 
+input {
+  padding: 5px;
+}
+
 
 .custom-scroll::-webkit-scrollbar {
   display: none;
