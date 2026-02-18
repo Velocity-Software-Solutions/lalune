@@ -16,7 +16,7 @@ return new class extends Migration {
             $table->string('first_name')->nullable();
             $table->string('last_name')->nullable();
             $table->string('source')->default('popup');
-            $table->enum('status', ['pending', 'subscribed', 'unsubscribed', 'bounced'])->default('subscribed');
+            $table->enum('status', ['pending', 'subscribed', 'unsubscribed', 'bounced'.'deleted'])->default('subscribed');
             $table->string('confirmation_token', 64)->nullable();
             $table->timestamp('confirmed_at')->nullable();
             $table->timestamp('subscribed_at')->nullable();

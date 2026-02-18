@@ -7,6 +7,7 @@ use App\Mail\NewsletterConfirmMail;
 use App\Mail\NewsletterSubscribedMail;
 use App\Models\NewsletterSubscriber;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Mail;
 use Str;
 
@@ -21,7 +22,7 @@ class NewsletterSubscriberController extends Controller
         $from = $request->query('from');     // subscribed from date (Y-m-d)
         $to = $request->query('to');       // subscribed to date (Y-m-d)
 
-        $query = NewsletterSubscriber::query();
+        $query = NewsletterSubscriber::query()->where('status', '!=', 'deleted');
 
         // Status filter
         if ($status && in_array($status, ['pending', 'subscribed', 'unsubscribed', 'bounced'], true)) {
@@ -157,4 +158,44 @@ class NewsletterSubscriberController extends Controller
 
         return back()->with('success', $subscriber->email . ' has been unsubscribed.');
     }
+
+    public function bulk(Request $request)
+{
+    $data = $request->validate([
+        'action' => ['required', Rule::in(['subscribe', 'unsubscribe', 'delete'])],
+        'ids'    => ['required', 'array', 'min:1'],
+        'ids.*'  => ['integer'],
+    ]);
+
+    $ids = array_values(array_unique($data['ids']));
+    $action = $data['action'];
+
+    $query = NewsletterSubscriber::query()->whereIn('id', $ids);
+
+    // If you want: restrict to only visible subscribers by your filters, you’d add more constraints here.
+
+    $affected = 0;
+
+    
+    if ($action === 'subscribe') {
+        // Only unsubscribe subscribed users (optional safety)
+        $affected = (clone $query)
+            ->where('status', '!=', 'subscribed')
+            ->update(['status' => 'subscribed']);
+    }
+
+    if ($action === 'unsubscribe') {
+        // Only unsubscribe subscribed users (optional safety)
+        $affected = (clone $query)
+            ->where('status', 'subscribed')
+            ->update(['status' => 'unsubscribed']);
+    }
+
+    if ($action === 'delete') {
+        $affected = (clone $query)->where('status', '!=', 'deleted')
+            ->update(['status' => 'deleted']);;
+    }
+
+    return back()->with('success', "{$action}d {$affected} subscriber(s).");
+}
 }

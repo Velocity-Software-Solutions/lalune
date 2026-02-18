@@ -57,6 +57,8 @@ Route::middleware(['auth', IsAdmin::class])->group(function () {
 
             Route::post('/subscribers/{subscriber}/unsubscribe', [NewsletterSubscriberController::class, 'unsubscribe'])
                 ->name('subscribers.unsubscribe');
+            Route::post('/subscribers/bulk', [NewsletterSubscriberController::class, 'bulk'])
+                ->name('subscribers.bulk');
             Route::get('/campaigns', [NewsletterCampaignController::class, 'index'])
                 ->name('campaigns.index');
 
