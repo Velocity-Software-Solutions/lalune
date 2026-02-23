@@ -1,5 +1,5 @@
 @extends('layouts.app')
-
+@section('canonical', url('/products'))
 @push('head')
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet">

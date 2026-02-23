@@ -1,7 +1,11 @@
 @extends('layouts.app')
 
+@section('title', 'LaLune By NE | Premium Canadian Clothing Brand')
+@section('meta_description', 'Shop LaLune By NE—premium Canadian local clothing brand. Designed in Canada with love &
+    care. Explore our latest collections and limited drops.')
+@section('canonical', url('/'))
+
 @push('head')
-    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet">
 @endpush
 
@@ -13,11 +17,11 @@
             font-weight: 700;
         }
 
-        h2 {
-            font-size: 1.875rem;
-            /* 30px */
-            font-weight: 600;
-        }
+        /*h2 {
+                font-size: 1.875rem; */
+        /* 30px */
+        /* font-weight: 600;
+            } */
 
         h3 {
             font-size: 1.5rem;
@@ -61,9 +65,9 @@
             class="w-full h-full bg-black/30 flex flex-col justify-evenly rounded-3xl backdrop:blur-sm px-8 py-4 text-center">
             {{-- Default fallback content --}}
             <div class="self-center">
-                <h1 class="text-2xl md:text-5xl font-bolder font-serif text-white/90">
+                <h2 class="text-2xl md:text-5xl font-bolder font-serif text-white/90">
                     Designed in Canada
-                </h1>
+                </h2>
                 <br>
                 <h3 class="text-xl md:text-4xl font-bold font-serif text-white/90">
                     With
@@ -88,7 +92,14 @@
             @endif
         </div>
     </div>
-
+    <div class="sr-only">
+        <h1>LaLune By NE – Premium Canadian Clothing Brand</h1>
+        <p>
+            LaLune By NE is a Canadian local clothing brand offering modern premium fashion designed in Canada.
+            Shop our latest collections, including limited drops, timeless essentials, and statement pieces.
+            Available online with delivery across Canada.
+        </p>
+    </div>
 
     @php
         // Flatten your grouped products to a simple array
@@ -285,7 +296,7 @@
 
                                             <!-- Main image -->
                                             <template x-for="(img, index) in item.images" :key="index">
-                                                <img x-show="current === index" x-transition
+                                                <img x-show="current === index" x-transition loading="lazy"
                                                     :src="`${storageBase}/${img.path}`"
                                                     @click="showModal = true; modalImage = `${storageBase}/${img.path}`"
                                                     class="h-full object-contain cursor-zoom-in rounded-md"
@@ -512,6 +523,19 @@
         </div>
     </div>
 
+    <noscript>
+        <section class="px-6 py-8">
+            <h2>Shop LaLune By NE Collections</h2>
+            <p>Explore premium clothing designed in Canada, including limited drops and essentials.</p>
+            <ul>
+                @foreach (collect($products)->flatten() as $p)
+                    <li>
+                        <a href="{{ route('products.show', $p->slug) }}">{{ $p->name }}</a>
+                    </li>
+                @endforeach
+            </ul>
+        </section>
+    </noscript>
     <script>
         function page(products = [], categories = [], storageBase = '', sizeOptions = []) {
             return {
@@ -671,4 +695,5 @@
             }
         }
     </script>
+
 @endsection

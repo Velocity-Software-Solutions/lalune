@@ -5,17 +5,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ config('app.name', 'Lalune By NE') }}</title>
-    <link rel="canonical" href="{{ url()->current() }}" />
-    <link rel="canonical" href="https://lalunebyne.com/products" />
+    <title>@yield('title', 'LaLune By NE | Canadian Local Clothing Brand')</title>
+    <link rel="canonical" href="@yield('canonical', url()->current())">
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montaga&display=swap" rel="stylesheet">
     <link rel="icon" type="image/x-icon" href="{{ asset('images/logo.jpeg') }}">
-    <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+    <script defer src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <meta name="description" content="@yield('meta_description', 'LaLune By NE is a premium Canadian local clothing brand offering modern, high-quality fashion designed in Canada. Discover our latest collections.')">
+    <meta property="og:site_name" content="LaLune">
+    <meta property="og:title" content="@yield('og_title', trim($__env->yieldContent('title', 'LaLune By NE | Canadian Local Clothing Brand')))">
+    <meta property="og:description" content="@yield('og_description', trim($__env->yieldContent('meta_description', 'LaLune By NE is a premium Canadian local clothing brand offering modern, high-quality fashion designed in Canada. Discover our latest collections.')))">
+    <meta name="twitter:title" content="@yield('twitter_title', trim($__env->yieldContent('title', 'LaLune By NE | Canadian Local Clothing Brand')))">
+    <meta name="twitter:description" content="@yield('twitter_description', trim($__env->yieldContent('meta_description', 'LaLune By NE is a premium Canadian local clothing brand offering modern, high-quality fashion designed in Canada. Discover our latest collections.')))">
+    <meta property="og:url" content="@yield('og_url', url()->current())">
+    <meta property="og:type" content="@yield('og_type', 'website')">
+    <meta property="og:image" content="@yield('og_image', asset('images/logo-horizontal.jpg'))">
+
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content="@yield('twitter_image', asset('images/logo-horizontal.jpg'))">
     @vite(['resources/css/app.css', 'resources/css/mousecursor.css', 'resources/js/app.js', 'resources/js/magiccursor.js'])
     @stack('head')
 
