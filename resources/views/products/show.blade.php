@@ -318,6 +318,283 @@
                 </div>
             </div>
 
+            {{-- Compact Reviews Rail (last 3) + modal write form --}}
+        @php
+            use Illuminate\Support\Str;
+
+            $approved = $product->relationLoaded('approvedReviews') ? $product->approvedReviews : collect();
+            $recent = $approved->sortByDesc(fn($r) => $r->created_at ?? now())->take(5);
+        @endphp
+
+        <div x-data="{ showReviewForm: false, showFullReview: false, fullReview: { author: '', date: '', rating: 0, comment: '', image: '' } }" class="mt-16 m-4" id="reviews">
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="text-lg font-semibold text-black">Customer Reviews</h2>
+
+                <div class="flex items-center gap-2">
+                    <button type="button" @click="showReviewForm = true"
+                        class="inline-flex items-center px-3 py-1.5 rounded-md bg-black text-white text-sm hover:bg-neutral-800">
+                        Write a review
+                    </button>
+                </div>
+            </div>
+
+            {{-- slim horizontal rail --}}
+            <div class="flex gap-3 overflow-x-auto pb-1 snap-x">
+                @forelse($recent as $rev)
+                    @php
+                        $r = max(0, min(5, (float) ($rev->rating ?? 0)));
+                        $full = (int) floor($r);
+                        $half = $r - $full >= 0.5 ? 1 : 0;
+                        $empty = 5 - $full - $half;
+
+                        $author = $rev->author_name ?? ($rev->name ?? (optional($rev->user)->name ?? 'Anonymous'));
+
+                        $img = $rev->image_path ? asset('storage/' . $rev->image_path) : null;
+                    @endphp
+
+                    <div
+                        class="shrink-0 snap-start w-52 rounded-lg border border-black/10 bg-white p-2 flex flex-col justify-between items-center">
+                        <div class="flex items-center gap-2">
+                            {{-- tiny image --}}
+                            @if ($img)
+                                <button type="button" class="shrink-0"
+                                    @click.prevent="showModal = true; modalImage = '{{ e($img) }}'">
+                                    <img src="{{ $img }}" alt="Review image"
+                                        class="w-10 h-10 object-cover rounded-md ring-1 ring-gray-200">
+                                </button>
+                            @endif
+
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-2">
+                                    <span
+                                        class="text-sm font-medium text-black truncate max-w-[8rem]">{{ $author }}</span>
+                                    <span
+                                        class="text-[11px] text-gray-500">{{ optional($rev->created_at)->diffForHumans() }}</span>
+                                </div>
+
+                                {{-- tiny squares rating --}}
+                                <div class="mt-0.5 inline-flex items-center gap-0.5 text-amber-500"
+                                    aria-label="{{ $r }} out of 5">
+                                    @for ($i = 0; $i < $full; $i++)
+                                        <svg class="w-3 h-3" viewBox="0 0 16 16" aria-hidden="true">
+                                            <rect x="1" y="1" width="14" height="14" rx="2"
+                                                fill="currentColor" />
+                                        </svg>
+                                    @endfor
+                                    @if ($half)
+                                        <svg class="w-3 h-3" viewBox="0 0 16 16" aria-hidden="true">
+                                            <rect x="1" y="1" width="7" height="14" rx="2"
+                                                fill="currentColor" />
+                                            <rect x="1" y="1" width="14" height="14" rx="2"
+                                                fill="none" stroke="currentColor" stroke-width="1.3" />
+                                        </svg>
+                                    @endif
+                                    @for ($i = 0; $i < $empty; $i++)
+                                        <svg class="w-3 h-3" viewBox="0 0 16 16" aria-hidden="true">
+                                            <rect x="1" y="1" width="14" height="14" rx="2"
+                                                fill="none" stroke="currentColor" stroke-width="1.3" />
+                                        </svg>
+                                    @endfor
+                                </div>
+                            </div>
+                        </div>
+                        @if ($rev->comment)
+                            <div class="mt-1 relative">
+                                {{-- scrollable text --}}
+                                <div class="max-h-24 overflow-y-auto pr-1 text-[12px] leading-snug text-gray-700">
+                                    {{ $rev->comment }}
+                                </div>
+
+                                {{-- soft gradient fades (top/bottom) --}}
+                                <div
+                                    class="pointer-events-none absolute inset-x-0 bottom-0 h-4 bg-gradient-to-t from-white to-transparent">
+                                </div>
+                            </div>
+
+                            {{-- read-full button (opens modal) --}}
+                            @php
+                                $author = $author ?? 'Anonymous';
+                                $created = optional($rev->created_at)->diffForHumans();
+                                $img = $rev->image_path ? asset('storage/' . $rev->image_path) : null;
+                                $rating = (float) ($rev->rating ?? 0);
+                            @endphp
+                            <button type="button" class="mt-2 text-[12px] font-medium text-black/80 hover:underline"
+                                @click="
+            showFullReview = true;
+            fullReview = {
+                author: @js($author),
+                date: @js($created),
+                rating: {{ $rating }},
+                comment: @js($rev->comment),
+                image: @js($img)
+            };
+        ">
+                                Read full review →
+                            </button>
+                        @endif
+
+                    </div>
+                @empty
+                    <div class="rounded-lg border border-dashed border-black/10 bg-white p-4 text-center text-gray-600">
+                        No reviews yet — be the first to review.
+                    </div>
+                @endforelse
+            </div>
+
+            {{-- ===== Modal: Write a review (full form) ===== --}}
+            <div x-cloak x-show="showReviewForm" x-transition
+                class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
+                @keydown.escape.window="showReviewForm=false" role="dialog" aria-modal="true">
+                <div class="w-full max-w-lg rounded-2xl bg-white p-5 shadow-xl">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-base font-semibold text-black">Write a review</h3>
+                        <button class="text-2xl leading-none -mr-1" @click="showReviewForm=false">&times;</button>
+                    </div>
+
+                    <form method="POST" action="{{ route('products.reviews.store', $product) }}"
+                        enctype="multipart/form-data" x-data="{ rating: Number('{{ old('rating', 0) }}') || 0, hover: 0 }" class="space-y-4">
+                        @csrf
+
+                        {{-- name & email --}}
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs text-gray-700 mb-1">Your name</label>
+                                <input type="text" name="author_name"
+                                    value="{{ old('author_name', optional(auth()->user())->name) }}"
+                                    class="w-full text-sm rounded-md border border-gray-300 focus:border-black focus:ring-black">
+                                @error('author_name')
+                                    <p class="mt-1 text-[11px] text-red-600">{{ $message }}</p>
+                                @enderror
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-700 mb-1">Email (not published)</label>
+                                <input type="email" name="author_email"
+                                    value="{{ old('author_email', optional(auth()->user())->email) }}"
+                                    class="w-full text-sm rounded-md border border-gray-300 focus:border-black focus:ring-black">
+                                @error('author_email')
+                                    <p class="mt-1 text-[11px] text-red-600">{{ $message }}</p>
+                                @enderror
+                            </div>
+                        </div>
+
+                        {{-- star picker --}}
+                        <div>
+                            <label class="block text-xs text-gray-700 mb-1">Rating</label>
+                            <div class="inline-flex items-center gap-1 text-amber-500 select-none">
+                                <template x-for="i in 5" :key="i">
+                                    <button type="button" class="p-0.5" @mouseenter="hover=i" @mouseleave="hover=0"
+                                        @click="rating=i" :aria-label="`Rate ${i} star${i>1?'s':''}`">
+                                        <svg class="w-6 h-6" viewBox="0 0 24 24" aria-hidden="true">
+                                            <path
+                                                d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.62L12 2 9.19 8.62 2 9.24l5.46 4.73L5.82 21 12 17.27z"
+                                                :fill="(hover || rating) >= i ? 'currentColor' : 'none'"
+                                                :stroke="(hover || rating) >= i ? 'currentColor' : 'currentColor'"
+                                                :stroke-width="(hover || rating) >= i ? 0 : 1.8" />
+                                        </svg>
+                                    </button>
+                                </template>
+                            </div>
+                            <input type="hidden" name="rating" :value="rating">
+                            @error('rating')
+                                <p class="text-[11px] text-red-600 mt-1">{{ $message }}</p>
+                            @enderror
+                        </div>
+
+                        {{-- image --}}
+                        <div>
+                            <label class="block text-xs text-gray-700 mb-1">Photo (optional)</label>
+                            <input type="file" name="image" accept="image/*"
+                                class="block w-full text-xs text-gray-700 file:mr-2 file:rounded-md file:border-0 file:bg-black file:px-2 file:py-1.5 file:text-white hover:file:bg-neutral-800">
+                            <p class="mt-1 text-[11px] text-gray-500">JPG/PNG up to 4MB.</p>
+                            @error('image')
+                                <p class="text-[11px] text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+
+                        {{-- comment --}}
+                        <div>
+                            <label class="block text-xs text-gray-700 mb-1">Comment</label>
+                            <textarea name="comment" rows="4"
+                                class="w-full text-sm rounded-md border-gray-300 focus:border-black focus:ring-black"
+                                placeholder="Share your thoughts…">{{ old('comment') }}</textarea>
+                            @error('comment')
+                                <p class="text-[11px] text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+
+                        <div class="flex items-center justify-end gap-2">
+                            <button type="button" @click="showReviewForm=false"
+                                class="px-3 py-2 rounded-md border text-sm">Cancel</button>
+                            <button type="submit"
+                                class="px-3 py-2 rounded-md bg-black text-white hover:bg-neutral-800 text-sm">
+                                Submit
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            {{-- ===== Modal: Read full review ===== --}}
+            <div x-cloak x-show="showFullReview" x-transition
+                class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
+                @keydown.escape.window="showFullReview=false" role="dialog" aria-modal="true">
+                <div class="w-full max-w-lg rounded-2xl bg-white p-5 shadow-xl ">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="min-w-0">
+                            <div class="flex items-center gap-2">
+                                <h3 class="text-base font-semibold text-black truncate"
+                                    x-text="fullReview.author || 'Anonymous'"></h3>
+                                <span class="text-[11px] text-gray-500" x-text="fullReview.date"></span>
+                            </div>
+                            {{-- stars --}}
+                            <!-- Replace the whole stars section with this -->
+                            <div class="mt-1 inline-flex items-center gap-0.5 text-amber-500"
+                                :aria-label="`${fullReview.rating} out of 5`">
+                                <template x-for="i in 5" :key="i">
+                                    <svg class="w-4 h-4" viewBox="0 0 16 16" aria-hidden="true">
+                                        <!-- outline square -->
+                                        <rect x="1" y="1" width="14" height="14" rx="2" fill="none"
+                                            stroke="currentColor" stroke-width="1.3"></rect>
+
+                                        <!-- fill square (full or partial) -->
+                                        <rect x="1" y="1"
+                                            :width="(() => {
+                                                const r = Number(fullReview.rating) || 0;
+                                                const full = Math.floor(r);
+                                                const hasHalf = (r - full) >= 0.5;
+                                                if (i <= full) return 14; // full
+                                                if (i === full + 1 && hasHalf) return 7; // half
+                                                return 0; // empty
+                                            })()"
+                                            height="14" rx="2" fill="currentColor"></rect>
+                                    </svg>
+                                </template>
+                            </div>
+
+                        </div>
+                        <button class="text-2xl leading-none -mr-1" @click="showFullReview=false">&times;</button>
+                    </div>
+
+                    <div class="space-y-3">
+                        <template x-if="fullReview.image">
+                            <img :src="fullReview.image" alt="Review image"
+                                class="w-full h-52 object-contain rounded-md">
+                        </template>
+
+                        <div class="relative">
+                            <div class="max-h-80 overflow-y-auto pr-2 text-sm text-gray-800 leading-relaxed"
+                                x-text="fullReview.comment"></div>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 flex items-center justify-end">
+                        <button class="px-3 py-2 rounded-md border text-sm" @click="showFullReview=false">Close</button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+
             <div>
                 @if ($smiliarProducts->isNotEmpty())
                     <h1 class="text-3xl montaga-regular m-6 mt-14">
