@@ -24,7 +24,6 @@ class ShippingOptionController extends Controller
     {
         $request->validate([
             'name' => 'required|string|max:255',
-            'name_ar' => 'nullable|string|max:255',
             'price' => 'required|numeric|min:0',
             'delivery_time' => 'required|string|max:255',
             'description' => 'nullable|string|max:500',
@@ -35,7 +34,6 @@ class ShippingOptionController extends Controller
 
         $shippingOption = ShippingOption::create([
             'name' => $request->name,
-            'name_ar' => $request->name_ar,
             'price' => $request->price,
             'delivery_time' => $request->delivery_time,
             'description' => $request->description,
@@ -62,7 +60,6 @@ class ShippingOptionController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'name_ar' => 'nullable|string|max:255',
             'price' => 'required|numeric|min:0',
             'delivery_time' => 'required|string|max:255',
             'description' => 'nullable|string|max:500',
@@ -73,6 +70,14 @@ class ShippingOptionController extends Controller
 
 
         $shippingOption->update($validated);
+
+        $shippingOption->cities()->delete();
+
+        foreach ($request->cities as $cityData) {
+            $shippingOption->cities()->create([
+                'city' => $cityData,
+            ]);
+        }
         return redirect()->back()->with('success', 'Shipping option updated successfully.');
     }
 

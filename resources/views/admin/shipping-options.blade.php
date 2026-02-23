@@ -126,24 +126,24 @@
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <label class="block">
                                     <span class="text-xs font-medium text-gray-600 dark:text-gray-300">Name</span>
-                                    <input name="name" x-model="name" class="form-input w-full">
+                                    <input name="name" x-model="name" class="form-input w-full  border rounded">
                                 </label>
                                 <label class="block">
                                     <span class="text-xs font-medium text-gray-600 dark:text-gray-300">Arabic Name</span>
-                                    <input name="name_ar" x-model="name_ar" class="form-input w-full">
+                                    <input name="name_ar" x-model="name_ar" class="form-input w-full  border rounded">
                                 </label>
                                 <label class="block">
                                     <span class="text-xs font-medium text-gray-600 dark:text-gray-300">Price</span>
                                     <input name="price" x-model="price" type="number" step="0.01"
-                                        class="form-input w-full">
+                                        class="form-input w-full  border rounded">
                                 </label>
                                 <label class="block">
                                     <span class="text-xs font-medium text-gray-600 dark:text-gray-300">Delivery Time</span>
-                                    <input name="delivery_time" x-model="delivery_time" class="form-input w-full">
+                                    <input name="delivery_time" x-model="delivery_time" class="form-input w-full  border rounded">
                                 </label>
                                 <label class="sm:col-span-2 block">
                                     <span class="text-xs font-medium text-gray-600 dark:text-gray-300">Description</span>
-                                    <input name="description" x-model="description" class="form-input w-full">
+                                    <input name="description" x-model="description" class="form-input w-full  border rounded">
                                 </label>
 
                                 <label class="block">
@@ -165,7 +165,7 @@
                                         class="mt-1 rounded-xl border border-gray-200 dark:border-gray-700">
                                         <div class="p-2 border-b border-gray-200 dark:border-gray-700">
                                             <input x-model="q" type="text" placeholder="Filter cities…"
-                                                class="form-input w-full">
+                                                class="form-input w-full  border rounded">
                                         </div>
                                         <div class="max-h-40 overflow-auto p-2 space-y-1">
                                             <template x-for="c in filterCities(country, q)" :key="c">
@@ -208,9 +208,9 @@
 
     <!-- Add Modal -->
     <div x-data="shippingForm()" x-on:open-add.window="open = true" x-show="open" x-transition.opacity
-        class="fixed inset-0 z-40 bg-black/40 p-4">
+        class="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm p-4">
         <div @click.outside="open=false"
-            class="mx-auto max-w-2xl rounded-2xl bg-white dark:bg-gray-800 shadow-xl overflow-hidden">
+            class="mx-auto max-w-2xl rounded-2xl bg-white dark:bg-gray-800 shadow-xl overflow-auto h-[90vh] scroll scroll-m-0 custom-scroll">
             <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
                 <h2 class="text-lg font-semibold text-gray-800 dark:text-white">Add Shipping Option</h2>
                 <button @click="open=false"
@@ -224,23 +224,19 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <label class="block">
                         <span class="text-xs font-medium text-gray-600 dark:text-gray-300">Name</span>
-                        <input name="name" x-model="name" class="form-input w-full">
-                    </label>
-                    <label class="block">
-                        <span class="text-xs font-medium text-gray-600 dark:text-gray-300">Arabic Name</span>
-                        <input name="name_ar" x-model="name_ar" class="form-input w-full">
+                        <input name="name" x-model="name" class="form-input w-full  border rounded">
                     </label>
                     <label class="block">
                         <span class="text-xs font-medium text-gray-600 dark:text-gray-300">Price</span>
-                        <input name="price" x-model="price" type="number" step="0.01" class="form-input w-full">
+                        <input name="price" x-model="price" type="number" step="0.01" class="form-input w-full  border rounded">
                     </label>
                     <label class="block">
                         <span class="text-xs font-medium text-gray-600 dark:text-gray-300">Delivery Time</span>
-                        <input name="delivery_time" x-model="delivery_time" class="form-input w-full">
+                        <input name="delivery_time" x-model="delivery_time" class="form-input w-full  border rounded">
                     </label>
                     <label class="sm:col-span-2 block">
                         <span class="text-xs font-medium text-gray-600 dark:text-gray-300">Description</span>
-                        <input name="description" x-model="description" class="form-input w-full">
+                        <input name="description" x-model="description" class="form-input w-full  border rounded">
                     </label>
 
                     <label class="block">
@@ -258,7 +254,7 @@
                         <div x-data="{ q: '' }" class="mt-1 rounded-xl border border-gray-200 dark:border-gray-700">
                             <div class="p-2 border-b border-gray-200 dark:border-gray-700">
                                 <input x-model="q" type="text" placeholder="Filter cities…"
-                                    class="form-input w-full">
+                                    class="form-input w-full  border rounded">
                             </div>
                             <div class="max-h-40 overflow-auto p-2 space-y-1">
                                 <template x-for="c in filterCities(country, q)" :key="c">

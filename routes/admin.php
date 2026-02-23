@@ -29,7 +29,7 @@ Route::middleware(['auth', IsAdmin::class])->group(function () {
     Route::resource('collections', CollectionController::class);
     Route::resource('products', ProductController::class);
     Route::resource('promo-codes', PromoCodeController::class);
-    // Route::resource('shipping-options', ShippingOptionController::class);
+    Route::resource('shipping-options', ShippingOptionController::class);
     Route::get('/reviews', [ProductReviewController::class, 'index'])->name('reviews.index');
     Route::patch('/reviews/{review}/approve', [ProductReviewController::class, 'approve'])->name('reviews.approve');
     Route::patch('/reviews/{review}/reject', [ProductReviewController::class, 'reject'])->name('reviews.reject');

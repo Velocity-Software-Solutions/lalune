@@ -114,740 +114,810 @@ class CheckoutController extends Controller
         return view('checkout.index', compact('cart', 'total', 'coupon', 'discount', 'subtotal', 'countries', 'shippingOptions'));
     }
 
-public function process(Request $request)
-{
-    $request->validate([
-        'email' => auth()->check() ? 'nullable|email' : 'required|email',
-        'full_name' => 'required|string|max:255',
-        'phone' => 'required|string|max:25|regex:/^\+?[0-9\s\-]{7,20}$/',
-        'country' => 'required|string',
-        'city' => 'required|string|max:255',
-        'state' => 'required|string|max:255',
-        'shipping_address' => 'required|string',
-        'billing_address' => 'nullable|string',
-    ]);
+    public function process(Request $request)
+    {
+        $request->validate([
+            'email' => auth()->check() ? 'nullable|email' : 'required|email',
+            'full_name' => 'required|string|max:255',
+            'phone' => 'required|string|max:25|regex:/^\+?[0-9\s\-]{7,20}$/',
+            'country' => 'required|string',
+            'city' => 'required|string|max:255',
+            'state' => 'required|string|max:255',
+            'shipping_address' => 'required|string',
+            'billing_address' => 'nullable|string',
+        ]);
 
-    // 1) Load cart
-    $cart = session('cart', []);
-    if (empty($cart) || !is_array($cart)) {
-        return redirect()->route('checkout.index')->with('error', 'Your cart is empty.');
-    }
-
-    // 2) Load products + stock + colors + sizes + (NEW) prices matrix
-    $productIds = collect($cart)
-        ->pluck('product_id')
-        ->map(fn($v) => (int) $v)
-        ->filter()
-        ->unique()
-        ->values()
-        ->all();
-
-    $with = [
-        'stock:id,product_id,color_id,size_id,quantity_on_hand',
-        'colors:id,product_id,color_code',
-        'sizes:id,product_id,size',
-    ];
-
-    // If you have a prices() relation (like in store()), eager-load it for pricing validation
-    // Adjust table/columns if needed.
-    $with[] = 'prices:id,product_id,color_id,size_id,price,discounted_price';
-
-    $products = Product::with($with)
-        ->whereIn('id', $productIds)
-        ->get()
-        ->keyBy('id');
-
-    // Build a fast price index: $priceIndex[productId]["color|size"] => row
-    // where color/size key can be "na" for null
-    $priceIndex = [];
-    foreach ($products as $p) {
-        if (!method_exists($p, 'prices')) continue;
-
-        $idx = [];
-        foreach (($p->prices ?? collect()) as $row) {
-            $ck = $row->color_id ? (string) (int) $row->color_id : 'na';
-            $sk = $row->size_id ? (string) (int) $row->size_id : 'na';
-            $idx["{$ck}|{$sk}"] = $row;
-        }
-        $priceIndex[$p->id] = $idx;
-    }
-
-    $changes = [];
-    $modified = false;
-
-    foreach ($cart as $key => &$line) {
-        $pid = (int) ($line['product_id'] ?? 0);
-        $qty = max(1, (int) ($line['quantity'] ?? 1));
-        $p = $products->get($pid);
-
-        if (!$p || (int) $p->status !== 1) {
-            unset($cart[$key]);
-            $modified = true;
-            $changes[] = "Removed “" . (($line['name'] ?? 'item') ?: 'item') . "” (no longer available).";
-            continue;
+        // 1) Load cart
+        $cart = session('cart', []);
+        if (empty($cart) || !is_array($cart)) {
+            return redirect()->route('checkout.index')->with('error', 'Your cart is empty.');
         }
 
-        // --- Resolve variant (stock) + resolve IDs (color_id / size_id)
-        $variant = null;
+        // 2) Load products + stock + colors + sizes + (NEW) prices matrix
+        $productIds = collect($cart)
+            ->pluck('product_id')
+            ->map(fn($v) => (int) $v)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
 
-        if (!empty($line['product_stock_id'])) {
-            $variant = $p->stock->firstWhere('id', (int) $line['product_stock_id']);
+        $with = [
+            'stock:id,product_id,color_id,size_id,quantity_on_hand',
+            'colors:id,product_id,color_code',
+            'sizes:id,product_id,size',
+        ];
 
-            // If the stock row exists, use its ids (strongest source of truth)
-            if ($variant) {
-                $line['color_id'] = (int) ($variant->color_id ?? 0);
-                $line['size_id']  = (int) ($variant->size_id ?? 0);
+        // If you have a prices() relation (like in store()), eager-load it for pricing validation
+        // Adjust table/columns if needed.
+        $with[] = 'prices:id,product_id,color_id,size_id,price,discounted_price';
+
+        $products = Product::with($with)
+            ->whereIn('id', $productIds)
+            ->get()
+            ->keyBy('id');
+
+        // Build a fast price index: $priceIndex[productId]["color|size"] => row
+        // where color/size key can be "na" for null
+        $priceIndex = [];
+        foreach ($products as $p) {
+            if (!method_exists($p, 'prices'))
+                continue;
+
+            $idx = [];
+            foreach (($p->prices ?? collect()) as $row) {
+                $ck = $row->color_id ? (string) (int) $row->color_id : 'na';
+                $sk = $row->size_id ? (string) (int) $row->size_id : 'na';
+                $idx["{$ck}|{$sk}"] = $row;
             }
+            $priceIndex[$p->id] = $idx;
         }
 
-        if (!$variant) {
-            $colorId = (int) ($line['color_id'] ?? 0);
-            $sizeId  = (int) ($line['size_id'] ?? 0);
+        $changes = [];
+        $modified = false;
 
-            // Legacy mapping (hex / size string) -> ids
-            if (!$colorId && !empty($line['color'])) {
-                $hex = strtoupper((string) $line['color']);
-                $colorId = (int) optional($p->colors->firstWhere('color_code', $hex))->id;
-            }
-            if (!$sizeId && !empty($line['size'])) {
-                $sz = (string) $line['size'];
-                $sizeId = (int) optional($p->sizes->firstWhere('size', $sz))->id;
-            }
+        foreach ($cart as $key => &$line) {
+            $pid = (int) ($line['product_id'] ?? 0);
+            $qty = max(1, (int) ($line['quantity'] ?? 1));
+            $p = $products->get($pid);
 
-            if ($colorId && empty($line['color_id'])) { $line['color_id'] = $colorId; $modified = true; }
-            if ($sizeId && empty($line['size_id'])) { $line['size_id'] = $sizeId; $modified = true; }
-
-            if ($colorId || $sizeId) {
-                $variant = $p->stock->first(fn($row) =>
-                    (int) $row->color_id === (int) $colorId &&
-                    (int) $row->size_id === (int) $sizeId
-                );
-            }
-
-            if ($variant && empty($line['product_stock_id'])) {
-                $line['product_stock_id'] = (int) $variant->id;
+            if (!$p || (int) $p->status !== 1) {
+                unset($cart[$key]);
                 $modified = true;
+                $changes[] = "Removed “" . (($line['name'] ?? 'item') ?: 'item') . "” (no longer available).";
+                continue;
             }
-        }
 
-        // --- Stock available
-        $available = $variant ? (int) $variant->quantity_on_hand : (int) $p->stock_quantity;
+            // --- Resolve variant (stock) + resolve IDs (color_id / size_id)
+            $variant = null;
 
-        if ($available <= 0) {
-            unset($cart[$key]);
-            $modified = true;
-            $changes[] = "Removed “" . (($line['name'] ?? 'item') ?: 'item') . "” (out of stock).";
-            continue;
-        }
+            if (!empty($line['product_stock_id'])) {
+                $variant = $p->stock->firstWhere('id', (int) $line['product_stock_id']);
 
-        if ($qty > $available) {
-            $line['quantity'] = $available;
-            $modified = true;
-            $changes[] = "Updated “" . (($line['name'] ?? 'item') ?: 'item') . "” to {$available} (limited stock).";
-        }
-
-        // --- ✅ NEW: Price validation using price matrix (color_id/size_id)
-        $colorId = (int) ($line['color_id'] ?? 0);
-        $sizeId  = (int) ($line['size_id'] ?? 0);
-
-        $ck = $colorId ? (string) $colorId : 'na';
-        $sk = $sizeId ? (string) $sizeId : 'na';
-
-        $variantPrice = null;
-
-        // Try exact match first
-        $idx = $priceIndex[$p->id] ?? [];
-        $candidates = [
-            "{$ck}|{$sk}",
-            // graceful fallback: color-only, size-only, or global override
-            "{$ck}|na",
-            "na|{$sk}",
-            "na|na",
-        ];
-
-        foreach ($candidates as $kCandidate) {
-            if (!isset($idx[$kCandidate])) continue;
-
-            $row = $idx[$kCandidate];
-            // Prefer discounted_price if present, else price
-            $val = $row->discounted_price ?? $row->price ?? null;
-            if ($val !== null && $val !== '') {
-                $variantPrice = (float) $val;
-                break;
-            }
-        }
-
-        // Fallback to product-level discount/price
-        if ($variantPrice === null) {
-            $variantPrice = ($p->discount_price !== null && $p->discount_price >= 0)
-                ? (float) $p->discount_price
-                : (float) $p->price;
-        }
-
-        // Sync price to cart if changed
-        if (!isset($line['price']) || (float) $line['price'] !== $variantPrice) {
-            $line['price'] = $variantPrice;
-            $modified = true;
-            $changes[] = "Updated price for “" . (($line['name'] ?? 'item') ?: 'item') . "”.";
-        }
-
-        // Ensure cart includes image_url (for snapshot later)
-        if (empty($line['image_url'])) {
-            $line['image_url'] = $p->main_image_url ?? $p->image_url ?? $p->thumbnail_url ?? null; // adapt to your schema
-        }
-    }
-    unset($line);
-
-    if ($modified) {
-        $cart = array_values(array_filter($cart, fn($row) => isset($row['quantity']) && (int) $row['quantity'] > 0));
-        if (empty($cart)) {
-            session()->forget('cart');
-            return redirect()->route('cart.index')->with('error', 'All items in your cart became unavailable.');
-        }
-        session()->put('cart', $cart);
-        return redirect()->route('cart.index')->with('warning', implode(' ', $changes) ?: 'We updated your cart based on current stock and prices.');
-    }
-
-    // Reserve (15 minutes)
-    $sessionKey = $request->session()->getId();
-    $userId = auth()->id();
-    $result = InventoryService::reserveCart($cart, $sessionKey, $userId, 15);
-
-    if (!empty($result['cartModified'])) {
-        $newCart = $result['cart'] ?? [];
-        if (empty($newCart)) {
-            session()->forget('cart');
-            return redirect()->route('cart.index')->with('error', 'All items became unavailable.');
-        }
-        session()->put('cart', $newCart);
-        return redirect()->route('cart.index')->with('warning', implode(' ', (array) ($result['changes'] ?? [])));
-    }
-
-    $cart = $result['cart'] ?? $cart;
-    session()->put('cart', $cart);
-
-    // ---- Normalize promos
-    $promosRaw = session('promos', []);
-    $promosRaw = is_array($promosRaw) ? $promosRaw : [];
-    $shippingPromo = collect($promosRaw)->first(fn($e) => ($e['discount_type'] ?? null) === 'shipping');
-    $discountPromo = collect($promosRaw)->first(fn($e) => in_array(($e['discount_type'] ?? null), ['fixed', 'percentage'], true));
-    $promos = ['shipping' => $shippingPromo, 'discount' => $discountPromo];
-
-    // ---- Build items & totals
-    $items = [];
-    $itemsSubtotalCents = 0;
-
-    foreach ($cart as $item) {
-        $unitCents = (int) round(((float) ($item['price'] ?? 0)) * 100);
-        $qty = max(1, (int) ($item['quantity'] ?? 1));
-        $lineCents = $unitCents * $qty;
-
-        $items[] = [
-            'name' => (string) ($item['name'] ?? 'Item'),
-            'unit_cents' => $unitCents,
-            'qty' => $qty,
-            'line_cents' => $lineCents,
-            'meta' => [
-                'product_id' => (int) ($item['product_id'] ?? 0),
-                'product_stock_id' => (int) ($item['product_stock_id'] ?? 0),
-                'color_id' => (int) ($item['color_id'] ?? 0),
-                'size_id' => (int) ($item['size_id'] ?? 0),
-                'image_url' => (string) ($item['image_url'] ?? ''),
-            ],
-        ];
-
-        $itemsSubtotalCents += $lineCents;
-    }
-
-    $shippingCentsDefault = 1500; // CAD 15
-    $shippingCents = !empty($promos['shipping']) ? 0 : $shippingCentsDefault;
-
-    $discountCents = 0;
-    if (!empty($promos['discount'])) {
-        $dp = $promos['discount'];
-        $type = $dp['discount_type'] ?? null;
-
-        if (isset($dp['amount'])) {
-            $discountCents = max(0, (int) round(((float) $dp['amount']) * 100));
-        } elseif ($type === 'percentage') {
-            $pct = max(0, min(100, (float) ($dp['percent'] ?? $dp['value'] ?? 0)));
-            $discountCents = (int) round(($pct / 100) * $itemsSubtotalCents);
-        } elseif ($type === 'fixed') {
-            $discountCents = (int) round(((float) ($dp['value'] ?? 0)) * 100);
-        }
-
-        $discountCents = min($discountCents, $itemsSubtotalCents);
-    }
-
-    $taxRate = 0.13;
-    $itemsAfterDiscountCents = max(0, $itemsSubtotalCents - $discountCents);
-    $taxCents = (int) round($itemsAfterDiscountCents * $taxRate);
-
-    // Stripe line_items (discount pro-rata)
-    $adjustedLineItems = [];
-    $remainingDiscount = $discountCents;
-    $lastIndex = array_key_last($items);
-
-    foreach ($items as $idx => $row) {
-        $share = 0;
-        if ($discountCents > 0 && $itemsSubtotalCents > 0) {
-            $share = (int) floor(($row['line_cents'] * $discountCents) / $itemsSubtotalCents);
-            if ($idx === $lastIndex) {
-                $share = min($row['line_cents'], $remainingDiscount);
-            }
-            $remainingDiscount -= $share;
-        }
-
-        $newLine = max(0, $row['line_cents'] - $share);
-        if ($newLine === 0) continue;
-
-        $newUnit = $row['qty'] > 0 ? (int) intdiv($newLine, $row['qty']) : 0;
-        $newUnit = max(0, $newUnit);
-
-        $adjustedLineItems[] = [
-            'price_data' => [
-                'currency' => 'cad',
-                'product_data' => [
-                    'name' => $row['name'],
-                    'metadata' => array_filter([
-                        'product_id' => (string) ($row['meta']['product_id'] ?? ''),
-                        'product_stock_id' => (string) ($row['meta']['product_stock_id'] ?? ''),
-                        'color_id' => (string) ($row['meta']['color_id'] ?? ''),
-                        'size_id' => (string) ($row['meta']['size_id'] ?? ''),
-                    ]),
-                ],
-                'unit_amount' => $newUnit,
-            ],
-            'quantity' => $row['qty'],
-        ];
-    }
-
-    if ($taxCents > 0) {
-        $adjustedLineItems[] = [
-            'price_data' => [
-                'currency' => 'cad',
-                'product_data' => ['name' => 'Tax (13%)'],
-                'unit_amount' => $taxCents,
-            ],
-            'quantity' => 1,
-        ];
-    }
-
-    if ($shippingCents > 0) {
-        $adjustedLineItems[] = [
-            'price_data' => [
-                'currency' => 'cad',
-                'product_data' => ['name' => 'Shipping'],
-                'unit_amount' => $shippingCents,
-            ],
-            'quantity' => 1,
-        ];
-    }
-
-    // Metadata + cart_snapshot
-    $reservationIdsCsv = implode(',', (array) ($result['reservation_ids'] ?? []));
-    $cartSnapshot = collect($cart)->map(function ($it) {
-        return [
-            'product_id' => (int) ($it['product_id'] ?? 0),
-            'product_stock_id' => (int) ($it['product_stock_id'] ?? 0),
-            'name' => (string) ($it['name'] ?? ''),
-            'qty' => (int) ($it['quantity'] ?? 1),
-            'price' => (float) ($it['price'] ?? 0),
-            'image_url' => $it['image_path'] ?? null,
-            'color' => $it['color'] ?? null,
-            'size' => $it['size'] ?? null,
-            'color_id' => (int) ($it['color_id'] ?? 0),
-            'size_id' => (int) ($it['size_id'] ?? 0),
-        ];
-    })->values()->all();
-
-    $allMeta = array_filter([
-        'user_id' => auth()->check() ? (string) auth()->id() : null,
-
-        'bill_name' => $request->full_name,
-        'bill_email' => $request->email,
-        'bill_phone' => $request->phone,
-        'bill_line1' => $request->billing_address,
-        'bill_city' => $request->city,
-        'bill_state' => $request->state,
-        'bill_country' => $request->country,
-
-        'ship_name' => $request->full_name,
-        'ship_email' => $request->email,
-        'ship_phone' => $request->phone,
-        'ship_line1' => $request->shipping_address,
-        'ship_city' => $request->city,
-        'ship_state' => $request->state,
-        'ship_country' => $request->country,
-
-        'promo_shipping_code' => $promos['shipping']['code'] ?? null,
-        'promo_discount_code' => $promos['discount']['code'] ?? null,
-        'promo_discount_type' => $promos['discount']['discount_type'] ?? null,
-        'promo_discount_percent' => (string) ($promos['discount']['percent'] ?? $promos['discount']['value'] ?? ''),
-        'promo_discount_amount' => (string) ($discountCents ?? 0),
-
-        'tax_rate_percent' => '13',
-        'tax_amount_cents' => (string) $taxCents,
-
-        'reservation_ids' => $reservationIdsCsv,
-        'reservation_expires_at' => optional($result['expires_at'] ?? null)?->toIso8601String(),
-
-        'cart_snapshot' => json_encode($cartSnapshot),
-    ], fn($v) => $v !== null && $v !== '');
-
-    $params = [
-        'mode' => 'payment',
-        'line_items' => $adjustedLineItems,
-        'success_url' => route('checkout.confirmation') . '?session_id={CHECKOUT_SESSION_ID}',
-        'cancel_url' => route('checkout.index'),
-        'metadata' => $allMeta,
-        'payment_intent_data' => ['metadata' => $allMeta],
-    ];
-
-    if (auth()->check() && !empty(auth()->user()->stripe_id)) {
-        $params['customer'] = auth()->user()->stripe_id;
-    } else {
-        $params['customer_creation'] = 'always';
-        if ($request->filled('email')) {
-            $params['customer_email'] = $request->input('email');
-        }
-    }
-
-    $stripe = new StripeClient(env('STRIPE_SECRET'));
-    $session = $stripe->checkout->sessions->create($params);
-
-    return redirect()->away($session->url);
-}
-
-
-public function confirmation(Request $request)
-{
-    $sessionId = $request->query('session_id');
-    abort_unless($sessionId, 404);
-
-    $stripe = new StripeClient(env('STRIPE_SECRET'));
-    $session = $stripe->checkout->sessions->retrieve($sessionId, ['expand' => ['payment_intent', 'customer']]);
-
-    if (($session->payment_status ?? null) !== 'paid') {
-        return redirect()->route('checkout.index')->with('error', 'Payment not completed.');
-    }
-
-    // Read line items (no need to expand price.product metadata anymore)
-    $lineItems = $stripe->checkout->sessions->allLineItems($sessionId, ['limit' => 100]);
-
-    // Merge metadata from PI and Session (PI wins)
-    $piMeta = ($session->payment_intent && $session->payment_intent->metadata) ? $session->payment_intent->metadata->toArray() : [];
-    $seMeta = $session->metadata ? $session->metadata->toArray() : [];
-
-    $meta = function (string $key, $default = null) use ($piMeta, $seMeta) {
-        return array_key_exists($key, $piMeta) ? $piMeta[$key] : (array_key_exists($key, $seMeta) ? $seMeta[$key] : $default);
-    };
-
-    // --- Resolve user safely
-    $userId = auth()->id();
-    if (!$userId) {
-        $uidMeta = $meta('user_id');
-        if (is_string($uidMeta) && ctype_digit($uidMeta) && User::whereKey((int) $uidMeta)->exists()) {
-            $userId = (int) $uidMeta;
-        }
-    }
-
-    // --- Commit reservations ONCE (fixes your double-commit bug)
-    $reservationIds = array_filter(array_map('intval', explode(',', (string) $meta('reservation_ids', ''))));
-    $committed = false;
-
-    try {
-        if (!empty($reservationIds)) {
-            $activeCount = \App\Models\StockReservation::query()
-                ->whereIn('id', $reservationIds)
-                ->where('status', true)
-                ->where('expires_at', '>', now())
-                ->count();
-
-            if ($activeCount > 0) {
-                InventoryService::commitReservations($reservationIds);
-                $committed = true;
-                Log::info('Reservations committed', ['count' => $activeCount, 'ids' => $reservationIds]);
-            }
-        }
-    } catch (\Throwable $e) {
-        Log::warning('commitReservations failed: ' . $e->getMessage());
-        $committed = false;
-    }
-
-    // Fallback decrement if nothing to commit
-    if (!$committed) {
-        \DB::transaction(function () use ($meta, $lineItems) {
-            // cart_snapshot is our source of truth for product ids/stock ids
-            $snap = json_decode((string) $meta('cart_snapshot', '[]'), true) ?: [];
-            $byName = collect($snap)->keyBy(fn($r) => (string) ($r['name'] ?? ''));
-
-            foreach ($lineItems->data as $li) {
-                $qty = (int) ($li->quantity ?? 1);
-                if ($qty <= 0) continue;
-
-                // try match by description/name
-                $row = $byName->get((string) ($li->description ?? '')) ?? null;
-
-                $productStockId = (int) ($row['product_stock_id'] ?? 0);
-                $productId = (int) ($row['product_id'] ?? 0);
-
-                if ($productStockId) {
-                    $ps = ProductStock::query()->whereKey($productStockId)->lockForUpdate()->first();
-                    if ($ps) {
-                        $ps->quantity_on_hand = max(0, ((int) $ps->quantity_on_hand) - $qty);
-                        $ps->save();
-                    }
-                } elseif ($productId) {
-                    $p = Product::query()->whereKey($productId)->lockForUpdate()->first();
-                    if ($p && isset($p->stock_quantity)) {
-                        $p->stock_quantity = max(0, ((int) $p->stock_quantity) - $qty);
-                        $p->save();
-                    }
+                // If the stock row exists, use its ids (strongest source of truth)
+                if ($variant) {
+                    $line['color_id'] = (int) ($variant->color_id ?? 0);
+                    $line['size_id'] = (int) ($variant->size_id ?? 0);
                 }
             }
-        });
 
-        Log::info('Fallback decrement completed');
+            if (!$variant) {
+                $colorId = (int) ($line['color_id'] ?? 0);
+                $sizeId = (int) ($line['size_id'] ?? 0);
+
+                // Legacy mapping (hex / size string) -> ids
+                if (!$colorId && !empty($line['color'])) {
+                    $hex = strtoupper((string) $line['color']);
+                    $colorId = (int) optional($p->colors->firstWhere('color_code', $hex))->id;
+                }
+                if (!$sizeId && !empty($line['size'])) {
+                    $sz = (string) $line['size'];
+                    $sizeId = (int) optional($p->sizes->firstWhere('size', $sz))->id;
+                }
+
+                if ($colorId && empty($line['color_id'])) {
+                    $line['color_id'] = $colorId;
+                    $modified = true;
+                }
+                if ($sizeId && empty($line['size_id'])) {
+                    $line['size_id'] = $sizeId;
+                    $modified = true;
+                }
+
+                if ($colorId || $sizeId) {
+                    $variant = $p->stock->first(
+                        fn($row) =>
+                        (int) $row->color_id === (int) $colorId &&
+                        (int) $row->size_id === (int) $sizeId
+                    );
+                }
+
+                if ($variant && empty($line['product_stock_id'])) {
+                    $line['product_stock_id'] = (int) $variant->id;
+                    $modified = true;
+                }
+            }
+
+            // --- Stock available
+            $available = $variant ? (int) $variant->quantity_on_hand : (int) $p->stock_quantity;
+
+            if ($available <= 0) {
+                unset($cart[$key]);
+                $modified = true;
+                $changes[] = "Removed “" . (($line['name'] ?? 'item') ?: 'item') . "” (out of stock).";
+                continue;
+            }
+
+            if ($qty > $available) {
+                $line['quantity'] = $available;
+                $modified = true;
+                $changes[] = "Updated “" . (($line['name'] ?? 'item') ?: 'item') . "” to {$available} (limited stock).";
+            }
+
+            // --- ✅ NEW: Price validation using price matrix (color_id/size_id)
+            $colorId = (int) ($line['color_id'] ?? 0);
+            $sizeId = (int) ($line['size_id'] ?? 0);
+
+            $ck = $colorId ? (string) $colorId : 'na';
+            $sk = $sizeId ? (string) $sizeId : 'na';
+
+            $variantPrice = null;
+
+            // Try exact match first
+            $idx = $priceIndex[$p->id] ?? [];
+            $candidates = [
+                "{$ck}|{$sk}",
+                // graceful fallback: color-only, size-only, or global override
+                "{$ck}|na",
+                "na|{$sk}",
+                "na|na",
+            ];
+
+            foreach ($candidates as $kCandidate) {
+                if (!isset($idx[$kCandidate]))
+                    continue;
+
+                $row = $idx[$kCandidate];
+                // Prefer discounted_price if present, else price
+                $val = $row->discounted_price ?? $row->price ?? null;
+                if ($val !== null && $val !== '') {
+                    $variantPrice = (float) $val;
+                    break;
+                }
+            }
+
+            // Fallback to product-level discount/price
+            if ($variantPrice === null) {
+                $variantPrice = ($p->discount_price !== null && $p->discount_price >= 0)
+                    ? (float) $p->discount_price
+                    : (float) $p->price;
+            }
+
+            // Sync price to cart if changed
+            if (!isset($line['price']) || (float) $line['price'] !== $variantPrice) {
+                $line['price'] = $variantPrice;
+                $modified = true;
+                $changes[] = "Updated price for “" . (($line['name'] ?? 'item') ?: 'item') . "”.";
+            }
+
+            // Ensure cart includes image_url (for snapshot later)
+            if (empty($line['image_url'])) {
+                $line['image_url'] = $p->main_image_url ?? $p->image_url ?? $p->thumbnail_url ?? null; // adapt to your schema
+            }
+        }
+        unset($line);
+
+        if ($modified) {
+            $cart = array_values(array_filter($cart, fn($row) => isset($row['quantity']) && (int) $row['quantity'] > 0));
+            if (empty($cart)) {
+                session()->forget('cart');
+                return redirect()->route('cart.index')->with('error', 'All items in your cart became unavailable.');
+            }
+            session()->put('cart', $cart);
+            return redirect()->route('cart.index')->with('warning', implode(' ', $changes) ?: 'We updated your cart based on current stock and prices.');
+        }
+
+        // Reserve (15 minutes)
+        $sessionKey = $request->session()->getId();
+        $userId = auth()->id();
+        $result = InventoryService::reserveCart($cart, $sessionKey, $userId, 15);
+
+        if (!empty($result['cartModified'])) {
+            $newCart = $result['cart'] ?? [];
+            if (empty($newCart)) {
+                session()->forget('cart');
+                return redirect()->route('cart.index')->with('error', 'All items became unavailable.');
+            }
+            session()->put('cart', $newCart);
+            return redirect()->route('cart.index')->with('warning', implode(' ', (array) ($result['changes'] ?? [])));
+        }
+
+        $cart = $result['cart'] ?? $cart;
+        session()->put('cart', $cart);
+
+        // ---- Normalize promos
+        $promosRaw = session('promos', []);
+        $promosRaw = is_array($promosRaw) ? $promosRaw : [];
+        $shippingPromo = collect($promosRaw)->first(fn($e) => ($e['discount_type'] ?? null) === 'shipping');
+        $discountPromo = collect($promosRaw)->first(fn($e) => in_array(($e['discount_type'] ?? null), ['fixed', 'percentage'], true));
+        $promos = ['shipping' => $shippingPromo, 'discount' => $discountPromo];
+
+        // ---- Build items & totals
+        $items = [];
+        $itemsSubtotalCents = 0;
+
+        foreach ($cart as $item) {
+            $unitCents = (int) round(((float) ($item['price'] ?? 0)) * 100);
+            $qty = max(1, (int) ($item['quantity'] ?? 1));
+            $lineCents = $unitCents * $qty;
+
+            $items[] = [
+                'name' => (string) ($item['name'] ?? 'Item'),
+                'unit_cents' => $unitCents,
+                'qty' => $qty,
+                'line_cents' => $lineCents,
+                'meta' => [
+                    'product_id' => (int) ($item['product_id'] ?? 0),
+                    'product_stock_id' => (int) ($item['product_stock_id'] ?? 0),
+                    'color_id' => (int) ($item['color_id'] ?? 0),
+                    'size_id' => (int) ($item['size_id'] ?? 0),
+                    'image_url' => (string) ($item['image_url'] ?? ''),
+                ],
+            ];
+
+            $itemsSubtotalCents += $lineCents;
+        }
+
+        // =======================
+// Shipping (server-side truth)
+// "cities" in DB = STATES
+// =======================
+        $country = trim((string) $request->input('country', ''));
+        $state = trim((string) $request->input('state', ''));
+
+        $stateLower = mb_strtolower($state);
+
+        // Load shipping options + their "states" list (stored as cities)
+        $shippingOptions = ShippingOption::query()
+            ->where('status', 1)
+            ->where('country', $country)
+            ->with(['cities:id,shipping_option_id,city']) // <-- change to your relation name if needed
+            ->get();
+
+        // Normalize + match
+        $matched = $shippingOptions
+            ->map(function ($o) {
+                $states = $o->cityItems?->pluck('city')->filter()->values()->all() ?? []; // these are STATES
+                $statesLower = array_map(fn($s) => mb_strtolower(trim((string) $s)), $states);
+
+                return [
+                    'id' => (int) $o->id,
+                    'name' => (string) $o->name,
+                    'price_cents' => (int) round(((float) $o->price) * 100),
+                    'states_lower' => $statesLower,              // [] => country-wide
+                    'is_country_wide' => count($statesLower) === 0,
+                    'delivery_time' => (string) ($o->delivery_time ?? ''),
+                ];
+            })
+            ->filter(function ($o) use ($stateLower) {
+                return $o['is_country_wide'] || ($stateLower !== '' && in_array($stateLower, $o['states_lower'], true));
+            })
+            ->values();
+
+        // Decide shipping cents:
+// - If promo free shipping => 0
+// - Else if matched => pick cheapest (or pick first, your call)
+// - Else fallback 15 CAD
+        $shippingCentsDefault = 1500; // 15.00 CAD
+        $matchedShippingCents = $matched->isNotEmpty()
+            ? (int) $matched->min('price_cents') // cheapest match
+            : null;
+
+        $shippingCents = !empty($promos['shipping'])
+            ? 0
+            : ($matchedShippingCents ?? $shippingCentsDefault);
+
+        // Optional: keep a name/id for metadata
+        $shippingPicked = null;
+        if (empty($promos['shipping']) && $matched->isNotEmpty()) {
+            // if you chose cheapest, pick the row that has it
+            $min = (int) $matched->min('price_cents');
+            $shippingPicked = $matched->firstWhere('price_cents', $min);
+        }
+
+        $discountCents = 0;
+        if (!empty($promos['discount'])) {
+            $dp = $promos['discount'];
+            $type = $dp['discount_type'] ?? null;
+
+            if (isset($dp['amount'])) {
+                $discountCents = max(0, (int) round(((float) $dp['amount']) * 100));
+            } elseif ($type === 'percentage') {
+                $pct = max(0, min(100, (float) ($dp['percent'] ?? $dp['value'] ?? 0)));
+                $discountCents = (int) round(($pct / 100) * $itemsSubtotalCents);
+            } elseif ($type === 'fixed') {
+                $discountCents = (int) round(((float) ($dp['value'] ?? 0)) * 100);
+            }
+
+            $discountCents = min($discountCents, $itemsSubtotalCents);
+        }
+
+        $taxRate = 0.13;
+        $itemsAfterDiscountCents = max(0, $itemsSubtotalCents - $discountCents);
+        $taxCents = (int) round($itemsAfterDiscountCents * $taxRate);
+
+        // Stripe line_items (discount pro-rata)
+        $adjustedLineItems = [];
+        $remainingDiscount = $discountCents;
+        $lastIndex = array_key_last($items);
+
+        foreach ($items as $idx => $row) {
+            $share = 0;
+            if ($discountCents > 0 && $itemsSubtotalCents > 0) {
+                $share = (int) floor(($row['line_cents'] * $discountCents) / $itemsSubtotalCents);
+                if ($idx === $lastIndex) {
+                    $share = min($row['line_cents'], $remainingDiscount);
+                }
+                $remainingDiscount -= $share;
+            }
+
+            $newLine = max(0, $row['line_cents'] - $share);
+            if ($newLine === 0)
+                continue;
+
+            $newUnit = $row['qty'] > 0 ? (int) intdiv($newLine, $row['qty']) : 0;
+            $newUnit = max(0, $newUnit);
+
+            $adjustedLineItems[] = [
+                'price_data' => [
+                    'currency' => 'cad',
+                    'product_data' => [
+                        'name' => $row['name'],
+                        'metadata' => array_filter([
+                            'product_id' => (string) ($row['meta']['product_id'] ?? ''),
+                            'product_stock_id' => (string) ($row['meta']['product_stock_id'] ?? ''),
+                            'color_id' => (string) ($row['meta']['color_id'] ?? ''),
+                            'size_id' => (string) ($row['meta']['size_id'] ?? ''),
+                        ]),
+                    ],
+                    'unit_amount' => $newUnit,
+                ],
+                'quantity' => $row['qty'],
+            ];
+        }
+
+        if ($taxCents > 0) {
+            $adjustedLineItems[] = [
+                'price_data' => [
+                    'currency' => 'cad',
+                    'product_data' => ['name' => 'Tax (13%)'],
+                    'unit_amount' => $taxCents,
+                ],
+                'quantity' => 1,
+            ];
+        }
+
+        if ($shippingCents > 0) {
+            $adjustedLineItems[] = [
+                'price_data' => [
+                    'currency' => 'cad',
+                    'product_data' => ['name' => 'Shipping'],
+                    'unit_amount' => $shippingCents,
+                ],
+                'quantity' => 1,
+            ];
+        }
+
+        // Metadata + cart_snapshot
+        $reservationIdsCsv = implode(',', (array) ($result['reservation_ids'] ?? []));
+        $cartSnapshot = collect($cart)->map(function ($it) {
+            return [
+                'product_id' => (int) ($it['product_id'] ?? 0),
+                'product_stock_id' => (int) ($it['product_stock_id'] ?? 0),
+                'name' => (string) ($it['name'] ?? ''),
+                'qty' => (int) ($it['quantity'] ?? 1),
+                'price' => (float) ($it['price'] ?? 0),
+                'image_url' => $it['image_path'] ?? null,
+                'color' => $it['color'] ?? null,
+                'size' => $it['size'] ?? null,
+                'color_id' => (int) ($it['color_id'] ?? 0),
+                'size_id' => (int) ($it['size_id'] ?? 0),
+            ];
+        })->values()->all();
+
+        $allMeta = array_filter([
+            'user_id' => auth()->check() ? (string) auth()->id() : null,
+
+            'bill_name' => $request->full_name,
+            'bill_email' => $request->email,
+            'bill_phone' => $request->phone,
+            'bill_line1' => $request->billing_address,
+            'bill_city' => $request->city,
+            'bill_state' => $request->state,
+            'bill_country' => $request->country,
+
+            'ship_name' => $request->full_name,
+            'ship_email' => $request->email,
+            'ship_phone' => $request->phone,
+            'ship_line1' => $request->shipping_address,
+            'ship_city' => $request->city,
+            'ship_state' => $request->state,
+            'ship_country' => $request->country,
+
+            'shipping_option_id' => $shippingPicked['id'] ?? null,
+            'shipping_option_name' => $shippingPicked['name'] ?? null,
+            'shipping_amount_cents' => (string) $shippingCents,
+
+            'promo_shipping_code' => $promos['shipping']['code'] ?? null,
+            'promo_discount_code' => $promos['discount']['code'] ?? null,
+            'promo_discount_type' => $promos['discount']['discount_type'] ?? null,
+            'promo_discount_percent' => (string) ($promos['discount']['percent'] ?? $promos['discount']['value'] ?? ''),
+            'promo_discount_amount' => (string) ($discountCents ?? 0),
+
+            'tax_rate_percent' => '13',
+            'tax_amount_cents' => (string) $taxCents,
+
+            'reservation_ids' => $reservationIdsCsv,
+            'reservation_expires_at' => optional($result['expires_at'] ?? null)?->toIso8601String(),
+
+            'cart_snapshot' => json_encode($cartSnapshot),
+        ], fn($v) => $v !== null && $v !== '');
+
+        $params = [
+            'mode' => 'payment',
+            'line_items' => $adjustedLineItems,
+            'success_url' => route('checkout.confirmation') . '?session_id={CHECKOUT_SESSION_ID}',
+            'cancel_url' => route('checkout.index'),
+            'metadata' => $allMeta,
+            'payment_intent_data' => ['metadata' => $allMeta],
+        ];
+
+        if (auth()->check() && !empty(auth()->user()->stripe_id)) {
+            $params['customer'] = auth()->user()->stripe_id;
+        } else {
+            $params['customer_creation'] = 'always';
+            if ($request->filled('email')) {
+                $params['customer_email'] = $request->input('email');
+            }
+        }
+
+        $stripe = new StripeClient(env('STRIPE_SECRET'));
+        $session = $stripe->checkout->sessions->create($params);
+
+        return redirect()->away($session->url);
     }
 
-    // Release any leftover holds for this browsing session
-    try {
-        InventoryService::releaseBySession($request->session()->getId());
-    } catch (\Throwable $e) {
-        Log::warning('Releasing holds by session failed: ' . $e->getMessage());
-    }
 
-    // Build addresses from metadata + Stripe customer_details fallback
-    $cust = $session->customer_details;
-    $addr = optional($cust)->address;
-    $email = optional($cust)->email ?? optional($session->customer)->email;
-    $name = optional($cust)->name;
+    public function confirmation(Request $request)
+    {
+        $sessionId = $request->query('session_id');
+        abort_unless($sessionId, 404);
 
-    $bill = [
-        'name' => $meta('bill_name', $name),
-        'email' => $meta('bill_email', $email),
-        'line1' => $meta('bill_line1'),
-        'line2' => $meta('bill_line2'),
-        'city' => $meta('bill_city'),
-        'state' => $meta('bill_state'),
-        'postal_code' => $meta('bill_postal'),
-        'country' => $meta('bill_country'),
-    ];
+        $stripe = new StripeClient(env('STRIPE_SECRET'));
+        $session = $stripe->checkout->sessions->retrieve($sessionId, ['expand' => ['payment_intent', 'customer']]);
 
-    $ship = [
-        'name' => $meta('ship_name', $name),
-        'email' => $meta('ship_email', $email),
-        'line1' => $meta('ship_line1', optional($addr)->line1),
-        'line2' => $meta('ship_line2', optional($addr)->line2),
-        'city' => $meta('ship_city', optional($addr)->city),
-        'state' => $meta('ship_state', optional($addr)->state),
-        'postal_code' => $meta('ship_postal', optional($addr)->postal_code),
-        'country' => $meta('ship_country', optional($addr)->country),
-        'phone' => $meta('ship_phone'),
-    ];
+        if (($session->payment_status ?? null) !== 'paid') {
+            return redirect()->route('checkout.index')->with('error', 'Payment not completed.');
+        }
 
-    $currency = strtoupper($session->currency);
-    $totalCents = (int) $session->amount_total;
-    $subCents = (int) $session->amount_subtotal;
-    $discCents = (int) (optional($session->total_details)->amount_discount ?? 0);
-    $shipCents = (int) (optional($session->total_details)->amount_shipping ?? 0);
-    $taxCents = (int) (optional($session->total_details)->amount_tax ?? 0);
+        // Read line items (no need to expand price.product metadata anymore)
+        $lineItems = $stripe->checkout->sessions->allLineItems($sessionId, ['limit' => 100]);
 
-    if ($taxCents === 0) {
-        $taxCents = (int) ($meta('tax_amount_cents') ?? 0);
-    }
+        // Merge metadata from PI and Session (PI wins)
+        $piMeta = ($session->payment_intent && $session->payment_intent->metadata) ? $session->payment_intent->metadata->toArray() : [];
+        $seMeta = $session->metadata ? $session->metadata->toArray() : [];
 
-    $paymentIntentId = is_string($session->payment_intent)
-        ? $session->payment_intent
-        : (optional($session->payment_intent)->id ?? null);
+        $meta = function (string $key, $default = null) use ($piMeta, $seMeta) {
+            return array_key_exists($key, $piMeta) ? $piMeta[$key] : (array_key_exists($key, $seMeta) ? $seMeta[$key] : $default);
+        };
 
-    // Build snapshot from cart_snapshot (fixes missing images + variant data)
-    $cartSnapshot = json_decode((string) $meta('cart_snapshot', '[]'), true) ?: [];
+        // --- Resolve user safely
+        $userId = auth()->id();
+        if (!$userId) {
+            $uidMeta = $meta('user_id');
+            if (is_string($uidMeta) && ctype_digit($uidMeta) && User::whereKey((int) $uidMeta)->exists()) {
+                $userId = (int) $uidMeta;
+            }
+        }
 
-    $itemsSnapshot = collect($lineItems->data)->map(function ($li) use ($currency, $cartSnapshot) {
-        $match = collect($cartSnapshot)->first(fn($r) => (string) ($r['name'] ?? '') === (string) ($li->description ?? ''));
+        // --- Commit reservations ONCE (fixes your double-commit bug)
+        $reservationIds = array_filter(array_map('intval', explode(',', (string) $meta('reservation_ids', ''))));
+        $committed = false;
 
-        return [
-            'description' => (string) ($li->description ?? ''),
-            'quantity' => (int) ($li->quantity ?? 1),
-            'amount_total' => (int) ($li->amount_total ?? 0),
-            'amount_subtotal' => (int) ($li->amount_subtotal ?? 0),
-            'currency' => strtoupper($li->currency ?? $currency),
+        try {
+            if (!empty($reservationIds)) {
+                $activeCount = \App\Models\StockReservation::query()
+                    ->whereIn('id', $reservationIds)
+                    ->where('status', true)
+                    ->where('expires_at', '>', now())
+                    ->count();
 
-            'product_id' => (int) ($match['product_id'] ?? 0),
-            'product_stock_id' => (int) ($match['product_stock_id'] ?? 0),
-            'color' => $match['color'] ?? null,
-            'size' => $match['size'] ?? null,
-            'color_id' => (int) ($match['color_id'] ?? 0),
-            'size_id' => (int) ($match['size_id'] ?? 0),
-            'image_url' => $match['image_url'] ?? null,
+                if ($activeCount > 0) {
+                    InventoryService::commitReservations($reservationIds);
+                    $committed = true;
+                    Log::info('Reservations committed', ['count' => $activeCount, 'ids' => $reservationIds]);
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('commitReservations failed: ' . $e->getMessage());
+            $committed = false;
+        }
 
-            'variant' => [
+        // Fallback decrement if nothing to commit
+        if (!$committed) {
+            \DB::transaction(function () use ($meta, $lineItems) {
+                // cart_snapshot is our source of truth for product ids/stock ids
+                $snap = json_decode((string) $meta('cart_snapshot', '[]'), true) ?: [];
+                $byName = collect($snap)->keyBy(fn($r) => (string) ($r['name'] ?? ''));
+
+                foreach ($lineItems->data as $li) {
+                    $qty = (int) ($li->quantity ?? 1);
+                    if ($qty <= 0)
+                        continue;
+
+                    // try match by description/name
+                    $row = $byName->get((string) ($li->description ?? '')) ?? null;
+
+                    $productStockId = (int) ($row['product_stock_id'] ?? 0);
+                    $productId = (int) ($row['product_id'] ?? 0);
+
+                    if ($productStockId) {
+                        $ps = ProductStock::query()->whereKey($productStockId)->lockForUpdate()->first();
+                        if ($ps) {
+                            $ps->quantity_on_hand = max(0, ((int) $ps->quantity_on_hand) - $qty);
+                            $ps->save();
+                        }
+                    } elseif ($productId) {
+                        $p = Product::query()->whereKey($productId)->lockForUpdate()->first();
+                        if ($p && isset($p->stock_quantity)) {
+                            $p->stock_quantity = max(0, ((int) $p->stock_quantity) - $qty);
+                            $p->save();
+                        }
+                    }
+                }
+            });
+
+            Log::info('Fallback decrement completed');
+        }
+
+        // Release any leftover holds for this browsing session
+        try {
+            InventoryService::releaseBySession($request->session()->getId());
+        } catch (\Throwable $e) {
+            Log::warning('Releasing holds by session failed: ' . $e->getMessage());
+        }
+
+        // Build addresses from metadata + Stripe customer_details fallback
+        $cust = $session->customer_details;
+        $addr = optional($cust)->address;
+        $email = optional($cust)->email ?? optional($session->customer)->email;
+        $name = optional($cust)->name;
+
+        $bill = [
+            'name' => $meta('bill_name', $name),
+            'email' => $meta('bill_email', $email),
+            'line1' => $meta('bill_line1'),
+            'line2' => $meta('bill_line2'),
+            'city' => $meta('bill_city'),
+            'state' => $meta('bill_state'),
+            'postal_code' => $meta('bill_postal'),
+            'country' => $meta('bill_country'),
+        ];
+
+        $ship = [
+            'name' => $meta('ship_name', $name),
+            'email' => $meta('ship_email', $email),
+            'line1' => $meta('ship_line1', optional($addr)->line1),
+            'line2' => $meta('ship_line2', optional($addr)->line2),
+            'city' => $meta('ship_city', optional($addr)->city),
+            'state' => $meta('ship_state', optional($addr)->state),
+            'postal_code' => $meta('ship_postal', optional($addr)->postal_code),
+            'country' => $meta('ship_country', optional($addr)->country),
+            'phone' => $meta('ship_phone'),
+        ];
+
+        $currency = strtoupper($session->currency);
+        $totalCents = (int) $session->amount_total;
+        $subCents = (int) $session->amount_subtotal;
+        $discCents = (int) (optional($session->total_details)->amount_discount ?? 0);
+        $shipCents = (int) (optional($session->total_details)->amount_shipping ?? 0);
+        $taxCents = (int) (optional($session->total_details)->amount_tax ?? 0);
+
+        if ($taxCents === 0) {
+            $taxCents = (int) ($meta('tax_amount_cents') ?? 0);
+        }
+
+        $paymentIntentId = is_string($session->payment_intent)
+            ? $session->payment_intent
+            : (optional($session->payment_intent)->id ?? null);
+
+        // Build snapshot from cart_snapshot (fixes missing images + variant data)
+        $cartSnapshot = json_decode((string) $meta('cart_snapshot', '[]'), true) ?: [];
+
+        $itemsSnapshot = collect($lineItems->data)->map(function ($li) use ($currency, $cartSnapshot) {
+            $match = collect($cartSnapshot)->first(fn($r) => (string) ($r['name'] ?? '') === (string) ($li->description ?? ''));
+
+            return [
+                'description' => (string) ($li->description ?? ''),
+                'quantity' => (int) ($li->quantity ?? 1),
+                'amount_total' => (int) ($li->amount_total ?? 0),
+                'amount_subtotal' => (int) ($li->amount_subtotal ?? 0),
+                'currency' => strtoupper($li->currency ?? $currency),
+
+                'product_id' => (int) ($match['product_id'] ?? 0),
+                'product_stock_id' => (int) ($match['product_stock_id'] ?? 0),
                 'color' => $match['color'] ?? null,
                 'size' => $match['size'] ?? null,
                 'color_id' => (int) ($match['color_id'] ?? 0),
                 'size_id' => (int) ($match['size_id'] ?? 0),
-            ],
-        ];
-    })->all();
+                'image_url' => $match['image_url'] ?? null,
 
-    // Promos for receipt (from metadata)
-    $promosApplied = [];
-    if ($code = $meta('promo_shipping_code')) {
-        $promosApplied[] = ['code' => $code, 'type' => 'shipping'];
-    }
-    if ($code = $meta('promo_discount_code')) {
-        $promosApplied[] = [
-            'code' => $code,
-            'type' => $meta('promo_discount_type'),
-            'percent' => $meta('promo_discount_percent'),
-            'amount_cents' => (int) ($meta('promo_discount_amount') ?? 0),
-        ];
-    }
+                'variant' => [
+                    'color' => $match['color'] ?? null,
+                    'size' => $match['size'] ?? null,
+                    'color_id' => (int) ($match['color_id'] ?? 0),
+                    'size_id' => (int) ($match['size_id'] ?? 0),
+                ],
+            ];
+        })->all();
 
-    // Idempotent order creation
-    $order = Order::firstOrCreate(
-        ['stripe_session_id' => $sessionId],
-        [
-            'user_id' => $userId,
-            'coupon_id' => null,
-            'shipping_option_id' => null,
+        // Promos for receipt (from metadata)
+        $promosApplied = [];
+        if ($code = $meta('promo_shipping_code')) {
+            $promosApplied[] = ['code' => $code, 'type' => 'shipping'];
+        }
+        if ($code = $meta('promo_discount_code')) {
+            $promosApplied[] = [
+                'code' => $code,
+                'type' => $meta('promo_discount_type'),
+                'percent' => $meta('promo_discount_percent'),
+                'amount_cents' => (int) ($meta('promo_discount_amount') ?? 0),
+            ];
+        }
 
-            'order_number' => 'ORD-' . now()->format('Ymd') . '-' . strtoupper(Str::random(6)),
-            'stripe_payment_intent' => $paymentIntentId,
-            'stripe_customer_id' => is_string($session->customer) ? $session->customer : (optional($session->customer)->id ?? null),
+        // Idempotent order creation
+        $order = Order::firstOrCreate(
+            ['stripe_session_id' => $sessionId],
+            [
+                'user_id' => $userId,
+                'coupon_id' => null,
+                'shipping_option_id' => null,
 
-            'full_name' => $ship['name'] ?? $bill['name'],
-            'email' => $ship['email'] ?? $bill['email'],
-            'phone' => $ship['phone'] ?? null,
+                'order_number' => 'ORD-' . now()->format('Ymd') . '-' . strtoupper(Str::random(6)),
+                'stripe_payment_intent' => $paymentIntentId,
+                'stripe_customer_id' => is_string($session->customer) ? $session->customer : (optional($session->customer)->id ?? null),
 
-            'currency' => $currency,
-            'subtotal_cents' => $subCents,
-            'discount_cents' => $discCents,
-            'shipping_cents' => $shipCents,
-            'tax_cents' => $taxCents,
-            'total_cents' => $totalCents,
+                'full_name' => $ship['name'] ?? $bill['name'],
+                'email' => $ship['email'] ?? $bill['email'],
+                'phone' => $ship['phone'] ?? null,
 
-            'payment_status' => 'paid',
-            'order_status' => 'processing',
-            'payment_method' => 'stripe_checkout',
-            'paid_at' => now(),
+                'currency' => $currency,
+                'subtotal_cents' => $subCents,
+                'discount_cents' => $discCents,
+                'shipping_cents' => $shipCents,
+                'tax_cents' => $taxCents,
+                'total_cents' => $totalCents,
 
-            'shipping_address_json' => $ship,
-            'billing_address_json' => $bill,
+                'payment_status' => 'paid',
+                'order_status' => 'processing',
+                'payment_method' => 'stripe_checkout',
+                'paid_at' => now(),
 
-            'coupon_code' => null,
-            'ip_address' => $request->ip(),
-            'user_agent' => substr((string) $request->userAgent(), 0, 1000),
+                'shipping_address_json' => $ship,
+                'billing_address_json' => $bill,
 
-            'snapshot' => $itemsSnapshot,
-            'metadata' => [
-                'stripe' => ['mode' => $session->mode],
-                'promos_applied' => $promosApplied,
-                'cart_snapshot' => $cartSnapshot,
-            ],
-            'notes' => null,
-        ]
-    );
+                'coupon_code' => null,
+                'ip_address' => $request->ip(),
+                'user_agent' => substr((string) $request->userAgent(), 0, 1000),
 
-    // Create OrderItems only once
-    if ($order->wasRecentlyCreated) {
-        // Prefetch color/size labels in bulk (optimization)
-        $colorIds = collect($cartSnapshot)->pluck('color_id')->filter()->unique()->values()->all();
-        $sizeIds  = collect($cartSnapshot)->pluck('size_id')->filter()->unique()->values()->all();
+                'snapshot' => $itemsSnapshot,
+                'metadata' => [
+                    'stripe' => ['mode' => $session->mode],
+                    'promos_applied' => $promosApplied,
+                    'cart_snapshot' => $cartSnapshot,
+                ],
+                'notes' => null,
+            ]
+        );
 
-        $colors = ProductColor::whereIn('id', $colorIds)->get(['id','name','color_code'])->keyBy('id');
-        $sizes  = ProductSize::whereIn('id', $sizeIds)->get(['id','size'])->keyBy('id');
+        // Create OrderItems only once
+        if ($order->wasRecentlyCreated) {
+            // Prefetch color/size labels in bulk (optimization)
+            $colorIds = collect($cartSnapshot)->pluck('color_id')->filter()->unique()->values()->all();
+            $sizeIds = collect($cartSnapshot)->pluck('size_id')->filter()->unique()->values()->all();
 
-        foreach ($lineItems->data as $li) {
-            $qty = (int) ($li->quantity ?? 1);
-            if ($qty <= 0) continue;
+            $colors = ProductColor::whereIn('id', $colorIds)->get(['id', 'name', 'color_code'])->keyBy('id');
+            $sizes = ProductSize::whereIn('id', $sizeIds)->get(['id', 'size'])->keyBy('id');
 
-            $lineTotal = (int) ($li->amount_total ?? 0);
-            $lineSub = (int) ($li->amount_subtotal ?? $lineTotal);
-            $unitCents = $qty > 0 ? intdiv($lineSub, $qty) : 0;
+            foreach ($lineItems->data as $li) {
+                $qty = (int) ($li->quantity ?? 1);
+                if ($qty <= 0)
+                    continue;
 
-            $match = collect($cartSnapshot)->first(fn($r) => (string) ($r['name'] ?? '') === (string) ($li->description ?? ''));
+                $lineTotal = (int) ($li->amount_total ?? 0);
+                $lineSub = (int) ($li->amount_subtotal ?? $lineTotal);
+                $unitCents = $qty > 0 ? intdiv($lineSub, $qty) : 0;
 
-            $productId = (int) ($match['product_id'] ?? 0) ?: null;
-            $productStockId = (int) ($match['product_stock_id'] ?? 0) ?: null;
-            $colorId = (int) ($match['color_id'] ?? 0) ?: null;
-            $sizeId = (int) ($match['size_id'] ?? 0) ?: null;
+                $match = collect($cartSnapshot)->first(fn($r) => (string) ($r['name'] ?? '') === (string) ($li->description ?? ''));
 
-            $colorModel = $colorId ? ($colors[$colorId] ?? null) : null;
-            $sizeModel  = $sizeId ? ($sizes[$sizeId] ?? null) : null;
+                $productId = (int) ($match['product_id'] ?? 0) ?: null;
+                $productStockId = (int) ($match['product_stock_id'] ?? 0) ?: null;
+                $colorId = (int) ($match['color_id'] ?? 0) ?: null;
+                $sizeId = (int) ($match['size_id'] ?? 0) ?: null;
 
-            OrderItem::create([
-                'order_id' => $order->id,
-                'product_id' => $productId,
-                'product_stock_id' => $productStockId,
-                'color_id' => $colorId,
-                'size_id' => $sizeId,
+                $colorModel = $colorId ? ($colors[$colorId] ?? null) : null;
+                $sizeModel = $sizeId ? ($sizes[$sizeId] ?? null) : null;
 
-                'name' => (string) ($li->description ?? 'Item'),
-                'quantity' => $qty,
-                'unit_price_cents' => $unitCents,
-                'subtotal_cents' => $lineSub,
-                'discount_cents' => max(0, $lineSub - $lineTotal),
-                'tax_cents' => 0,
-                'total_cents' => $lineTotal,
-                'currency' => strtoupper($li->currency ?? $currency),
-
-                'snapshot' => [
+                OrderItem::create([
+                    'order_id' => $order->id,
                     'product_id' => $productId,
                     'product_stock_id' => $productStockId,
                     'color_id' => $colorId,
                     'size_id' => $sizeId,
 
-                    'image_url' => $match['image_url'] ?? null,
-                    'color_name' => $colorModel?->name,
-                    'color_code' => $colorModel?->color_code,
-                    'size' => $sizeModel?->size,
+                    'name' => (string) ($li->description ?? 'Item'),
+                    'quantity' => $qty,
+                    'unit_price_cents' => $unitCents,
+                    'subtotal_cents' => $lineSub,
+                    'discount_cents' => max(0, $lineSub - $lineTotal),
+                    'tax_cents' => 0,
+                    'total_cents' => $lineTotal,
+                    'currency' => strtoupper($li->currency ?? $currency),
 
-                    'variant' => [
+                    'snapshot' => [
+                        'product_id' => $productId,
+                        'product_stock_id' => $productStockId,
                         'color_id' => $colorId,
                         'size_id' => $sizeId,
+
+                        'image_url' => $match['image_url'] ?? null,
                         'color_name' => $colorModel?->name,
                         'color_code' => $colorModel?->color_code,
                         'size' => $sizeModel?->size,
+
+                        'variant' => [
+                            'color_id' => $colorId,
+                            'size_id' => $sizeId,
+                            'color_name' => $colorModel?->name,
+                            'color_code' => $colorModel?->color_code,
+                            'size' => $sizeModel?->size,
+                        ],
                     ],
-                ],
-            ]);
+                ]);
+            }
+
+            // Promo bookkeeping
+            if (!empty($promosApplied) && class_exists(PromoCode::class)) {
+                foreach ($promosApplied as $applied) {
+                    try {
+                        if ($pc = PromoCode::where('code', $applied['code'])->first()) {
+                            $pc->increment('used_count');
+                        }
+                    } catch (\Throwable $e) {
+                        Log::warning('Promo usage increment failed: ' . $e->getMessage());
+                    }
+                }
+            }
+
+            session()->forget(['cart', 'coupon', 'promos']);
         }
 
-        // Promo bookkeeping
-        if (!empty($promosApplied) && class_exists(PromoCode::class)) {
-            foreach ($promosApplied as $applied) {
-                try {
-                    if ($pc = PromoCode::where('code', $applied['code'])->first()) {
-                        $pc->increment('used_count');
-                    }
-                } catch (\Throwable $e) {
-                    Log::warning('Promo usage increment failed: ' . $e->getMessage());
-                }
+        // Only email once
+        if (!$order->getAttribute('receipt_emailed_at')) {
+            try {
+                Mail::mailer('noreply')
+                    ->to($order->email)
+                    ->bcc(['info@lalunebyne.com', 'velocitysoftwaresolutions000@gmail.com'])
+                    ->send(new \App\Mail\OrderConfirmationMail($order));
+
+                $order->forceFill(['receipt_emailed_at' => now()])->save();
+            } catch (\Throwable $e) {
+                Log::warning('Order receipt email failed: ' . $e->getMessage());
             }
         }
 
-        session()->forget(['cart', 'coupon', 'promos']);
+        return view('checkout.receipt', compact('order', 'session'));
     }
-
-    // Only email once
-    if (!$order->getAttribute('receipt_emailed_at')) {
-        try {
-            Mail::mailer('noreply')
-                ->to($order->email)
-                ->bcc(['info@lalunebyne.com', 'velocitysoftwaresolutions000@gmail.com'])
-                ->send(new \App\Mail\OrderConfirmationMail($order));
-
-            $order->forceFill(['receipt_emailed_at' => now()])->save();
-        } catch (\Throwable $e) {
-            Log::warning('Order receipt email failed: ' . $e->getMessage());
-        }
-    }
-
-    return view('checkout.receipt', compact('order', 'session'));
-}
 
 
 
