@@ -126,331 +126,298 @@ class OrderController extends Controller
      | Store: persist order + items
      |-------------------------------------------------------------- */
 
-public function store(Request $request)
-{
-    $validated = $request->validate([
-        'customer_mode' => 'required|in:existing,new',
-        'email' => 'required|email:rfc,dns',
-        'name' => 'nullable|string|max:255',
-        'user_id' => 'nullable|integer|exists:users,id',
+    public function store(Request $request)
+    {
+        // ---------- Validate ----------
+        $validated = $request->validate([
+            'customer_mode' => 'required|in:existing,new',
 
-        'shipping_address' => 'required|string|max:5000',
-        'billing_address' => 'nullable|string|max:5000',
+            'email' => 'required|email:rfc,dns',
+            'name' => 'nullable|string|max:255',
 
-        'payment_method' => 'required|string|max:100',
-        'coupon_id' => 'nullable|integer|exists:coupons,id',
-        'notes' => 'nullable|string|max:5000',
+            'user_id' => 'nullable|integer|exists:users,id',
 
-        'items' => 'required|array|min:1',
-        'items.*.product_id' => 'nullable|integer|exists:products,id',
-        'items.*.name' => 'nullable|string|max:255',
-        'items.*.product_name' => 'nullable|string|max:255',
-        'items.*.quantity' => 'required|integer|min:1',
+            'shipping_address' => 'required|string|max:5000',
+            'billing_address' => 'nullable|string|max:5000',
 
-        'items.*.product_stock_id' => 'nullable|integer',
-        'items.*.color_id' => 'nullable|integer',
-        'items.*.size_id' => 'nullable|integer',
+            'payment_method' => 'required|string|max:100',
+            'coupon_id' => 'nullable|integer|exists:coupons,id',
+            'notes' => 'nullable|string|max:5000',
 
-        'items.*.price' => 'nullable|numeric|min:0',
+            'items' => 'required|array|min:1',
 
-        'promos' => 'array',
-        'promos.shipping.code' => 'nullable|string|max:100',
-        'promos.discount.code' => 'nullable|string|max:100',
-        'promos.discount.type' => 'nullable|in:fixed,percentage',
-        'promos.discount.percent' => 'nullable|numeric|min:0',
-        'promos.discount.amount_cents' => 'nullable|integer|min:0',
+            'items.*.product_id' => 'nullable|integer|exists:products,id',
+            'items.*.product_name' => 'nullable|string|max:255',
+            'items.*.price' => 'required|numeric|min:0',
+            'items.*.quantity' => 'required|integer|min:1',
 
-        'shipping_option_id' => 'nullable|integer|exists:shipping_options,id',
-        'shipping_cost' => 'nullable|numeric|min:0',
-    ]);
+            // ✅ NEW (for stock matrix decrement)
+            'items.*.product_stock_id' => 'nullable|integer|exists:product_stocks,id',
+            'items.*.color_id' => 'nullable|integer|exists:product_colors,id',
+            'items.*.size_id' => 'nullable|integer|exists:product_sizes,id',
 
-    $currency = strtoupper(config('app.currency', 'USD'));
-
-    // ---------- Resolve customer ----------
-    $email = trim($validated['email']);
-    $name  = trim((string)($validated['name'] ?? ''));
-
-    $userId = null;
-    if ($validated['customer_mode'] === 'existing') {
-        $existing = User::where('email', $email)->first();
-        $userId = $existing?->id ?? ($validated['user_id'] ?? null);
-    } else {
-        $existing = User::where('email', $email)->first();
-        $userId = $existing?->id ?? null;
-    }
-
-    // ---------- Bulk load products ----------
-    $productIds = collect($validated['items'])
-        ->pluck('product_id')
-        ->filter()
-        ->map(fn($v) => (int)$v)
-        ->unique()
-        ->values()
-        ->all();
-
-    $products = Product::query()
-        ->with([
-            'images:id,product_id,image_path,thumbnail,color_code',
-            'colors:id,product_id,name,color_code',
-            'sizes:id,product_id,size',
-            'stock:id,product_id,color_id,size_id,quantity_on_hand',
-            'prices:id,product_id,color_id,size_id,price,discounted_price',
-        ])
-        ->whereIn('id', $productIds)
-        ->get()
-        ->keyBy('id');
-
-    // priceIndex[pid]["color|size"] => row
-    $priceIndex = [];
-    foreach ($products as $p) {
-        $idx = [];
-        foreach (($p->prices ?? collect()) as $row) {
-            $ck = $row->color_id ? (string)(int)$row->color_id : 'na';
-            $sk = $row->size_id ? (string)(int)$row->size_id : 'na';
-            $idx["{$ck}|{$sk}"] = $row;
-        }
-        $priceIndex[$p->id] = $idx;
-    }
-
-    // ✅ FIXED: never return 0 unless product price is truly 0
-    $variantPriceFor = function (Product $p, ?int $colorId, ?int $sizeId) use ($priceIndex) {
-        $ck = $colorId ? (string)$colorId : 'na';
-        $sk = $sizeId ? (string)$sizeId : 'na';
-
-        $idx = $priceIndex[$p->id] ?? [];
-        $candidates = [
-            "{$ck}|{$sk}",
-            "{$ck}|na",
-            "na|{$sk}",
-            "na|na",
-        ];
-
-        $basePrice = (float)($p->price ?? 0);
-        $baseDiscount = ($p->discount_price !== null && (float)$p->discount_price > 0)
-            ? (float)$p->discount_price
-            : null;
-
-        foreach ($candidates as $key) {
-            if (!isset($idx[$key])) continue;
-
-            $row = $idx[$key];
-
-            $price = (isset($row->price) && (float)$row->price > 0)
-                ? (float)$row->price
-                : null;
-
-            $disc = (isset($row->discounted_price) && (float)$row->discounted_price > 0)
-                ? (float)$row->discounted_price
-                : null;
-
-            // discounted wins only if it's a real discount
-            if ($price !== null && $disc !== null && $disc < $price) return $disc;
-            if ($price !== null) return $price;
-
-            // if matrix price missing/0, fallback to base product values
-            break;
-        }
-
-        if ($baseDiscount !== null && $baseDiscount < $basePrice) return $baseDiscount;
-        return $basePrice;
-    };
-
-    // ---------- Build items + totals ----------
-    $orderItemsForCreate = [];
-    $itemsSnapshot = [];
-    $subtotalCents = 0;
-
-    foreach ($validated['items'] as $row) {
-        $qty = max(1, (int)($row['quantity'] ?? 1));
-
-        $productId = isset($row['product_id']) ? (int)$row['product_id'] : null;
-        $productStockId = isset($row['product_stock_id']) && $row['product_stock_id'] !== '' ? (int)$row['product_stock_id'] : null;
-        $colorId = isset($row['color_id']) && $row['color_id'] !== '' ? (int)$row['color_id'] : null;
-        $sizeId  = isset($row['size_id']) && $row['size_id'] !== '' ? (int)$row['size_id'] : null;
-
-        $product = $productId ? $products->get($productId) : null;
-
-        $productName = trim((string)($row['name'] ?? $row['product_name'] ?? ''));
-        $resolvedName = $productName;
-
-        $sku = null;
-        $thumbPath = null;
-
-        $hasColors = false;
-        $hasSizes  = false;
-        $variant   = null;
-
-        if ($product) {
-            $hasColors = ($product->colors?->isNotEmpty() ?? false);
-            $hasSizes  = ($product->sizes?->isNotEmpty() ?? false);
-
-            if ($resolvedName === '') $resolvedName = (string)$product->name;
-            $sku = $product->sku ?? null;
-            $thumbPath = $product->images?->first()?->image_path;
-
-            if ($productStockId) {
-                $variant = $product->stock?->firstWhere('id', $productStockId);
-                if ($variant) {
-                    $colorId = $variant->color_id ? (int)$variant->color_id : null;
-                    $sizeId  = $variant->size_id ? (int)$variant->size_id : null;
-                } else {
-                    throw \Illuminate\Validation\ValidationException::withMessages([
-                        'items' => ["Selected variant is invalid for product #{$product->id}."],
-                    ]);
-                }
-            }
-
-            if (!$variant && ($hasColors || $hasSizes)) {
-                if ($hasColors && !$colorId) {
-                    throw \Illuminate\Validation\ValidationException::withMessages([
-                        'items' => ["Color is required for “{$product->name}”."],
-                    ]);
-                }
-                if ($hasSizes && !$sizeId) {
-                    throw \Illuminate\Validation\ValidationException::withMessages([
-                        'items' => ["Size is required for “{$product->name}”."],
-                    ]);
-                }
-
-                $variant = $product->stock?->first(function ($r) use ($colorId, $sizeId) {
-                    return ((int)($r->color_id ?? 0) === (int)($colorId ?? 0))
-                        && ((int)($r->size_id  ?? 0) === (int)($sizeId  ?? 0));
-                });
-
-                if (!$variant) {
-                    throw \Illuminate\Validation\ValidationException::withMessages([
-                        'items' => ["Selected options are not available for “{$product->name}”."],
-                    ]);
-                }
-
-                $productStockId = (int)$variant->id;
-            }
-
-            if ($variant) {
-                $available = (int)($variant->available_qty ?? $variant->quantity_on_hand ?? 0);
-                if ($available <= 0) {
-                    throw \Illuminate\Validation\ValidationException::withMessages([
-                        'items' => ["“{$product->name}” is out of stock."],
-                    ]);
-                }
-                if ($qty > $available) $qty = $available;
-            }
-        }
-
-        if ($resolvedName === '') $resolvedName = 'Custom Item';
-
-        // ✅ recompute price safely (now won't go to 0 بسبب discounted_price=0)
-        $unitPrice = $product
-            ? $variantPriceFor($product, $colorId, $sizeId)
-            : (float)($row['price'] ?? 0);
-
-        $unitCents = (int)round($unitPrice * 100);
-        $rowSubtotal = $unitCents * $qty;
-        $subtotalCents += $rowSubtotal;
-
-        $orderItemsForCreate[] = [
-            'product_id' => $product?->id,
-            'product_stock_id' => $productStockId,
-            'color_id' => $colorId,
-            'size_id' => $sizeId,
-
-            'name' => $resolvedName,
-            'sku' => $sku,
-            'quantity' => $qty,
-
-            'unit_price_cents' => $unitCents,
-            'subtotal_cents' => $rowSubtotal,
-            'discount_cents' => 0,
-            'tax_cents' => 0,
-            'total_cents' => $rowSubtotal,
-            'currency' => $currency,
-        ];
-    }
-
-    // ---------- Shipping + tax ----------
-    $shippingCents = 0;
-    $taxCents = 0;
-    $taxRateUsed = null;
-
-    $selectedShip = null;
-    if (!empty($validated['shipping_option_id'])) {
-        $selectedShip = ShippingOption::find((int)$validated['shipping_option_id']);
-    }
-
-    if ($selectedShip) {
-        $shippingCents = (int)round(((float)$selectedShip->price) * 100);
-
-        $rate = $selectedShip->tax_percentage;
-        $rate = is_null($rate) ? null : (float)$rate;
-        if ($rate !== null && $rate > 1) $rate = $rate / 100;
-        if ($rate === null) $rate = 0.13;
-
-        $taxRateUsed = $rate;
-        $taxCents = (int)round($subtotalCents * $rate);
-    }
-
-    $discountCents = 0;
-    $totalCents = max(0, $subtotalCents - $discountCents + $shippingCents + $taxCents);
-
-    return \DB::transaction(function () use (
-        $request,
-        $validated,
-        $userId,
-        $name,
-        $email,
-        $currency,
-        $subtotalCents,
-        $discountCents,
-        $shippingCents,
-        $taxCents,
-        $totalCents,
-        $orderItemsForCreate,
-        $selectedShip,
-        $taxRateUsed
-    ) {
-        $order = Order::create([
-            'user_id' => $userId,
-            'coupon_id' => $validated['coupon_id'] ?? null,
-            'order_number' => 'ORD-' . now()->format('Ymd') . '-' . strtoupper(\Illuminate\Support\Str::random(6)),
-
-            'full_name' => ($name ?: $email),
-            'email' => $email,
-
-            'currency' => $currency,
-            'subtotal_cents' => $subtotalCents,
-            'discount_cents' => $discountCents,
-            'shipping_cents' => $shippingCents,
-            'tax_cents' => $taxCents,
-            'total_cents' => $totalCents,
-
-            'payment_status' => 'pending',
-            'order_status' => 'processing',
-            'payment_method' => $validated['payment_method'],
-
-            'shipping_address_json' => ['raw' => $validated['shipping_address']],
-            'billing_address_json' => ['raw' => $validated['billing_address'] ?? $validated['shipping_address']],
-
-            'ip_address' => $request->ip(),
-            'user_agent' => substr((string)$request->userAgent(), 0, 1000),
-
-            'metadata' => [
-                'source' => 'admin',
-                'shipping_option_id' => $validated['shipping_option_id'] ?? null,
-                'shipping_name' => $selectedShip?->name,
-                'tax_rate' => $taxRateUsed,
-            ],
-            'notes' => $validated['notes'] ?? null,
+            'promos' => 'array',
+            'promos.shipping.code' => 'nullable|string|max:100',
+            'promos.discount.code' => 'nullable|string|max:100',
+            'promos.discount.type' => 'nullable|in:fixed,percentage',
+            'promos.discount.percent' => 'nullable|numeric|min:0',
+            'promos.discount.amount_cents' => 'nullable|integer|min:0',
         ]);
 
-        foreach ($orderItemsForCreate as $li) {
-            OrderItem::create($li + ['order_id' => $order->id]);
+        $currency = strtoupper(config('app.currency', 'USD'));
+
+        $email = trim($validated['email']);
+        $name = trim((string) ($validated['name'] ?? ''));
+
+        // Resolve/normalize customer
+        $userId = null;
+        if ($validated['customer_mode'] === 'existing') {
+            $existing = User::where('email', $email)->first();
+            $userId = $existing?->id ?? ($validated['user_id'] ?? null);
+        } else {
+            $existing = User::where('email', $email)->first();
+            $userId = $existing?->id ?? null;
         }
 
-        return redirect()
-            ->route('admin.orders.show', $order)
-            ->with('success', 'Order created successfully.');
-    });
-}
+        // Addresses JSON
+        $shippingJson = ['raw' => $validated['shipping_address']];
+        $billingJson = ['raw' => $validated['billing_address'] ?? $validated['shipping_address']];
+
+        // Promos metadata
+        $promosInput = $request->input('promos', []);
+        $promosApplied = [];
+
+        if ($code = data_get($promosInput, 'shipping.code')) {
+            $promosApplied[] = ['code' => $code, 'type' => 'shipping'];
+        }
+        if ($code = data_get($promosInput, 'discount.code')) {
+            $promosApplied[] = [
+                'code' => $code,
+                'type' => data_get($promosInput, 'discount.type'),
+                'percent' => data_get($promosInput, 'discount.percent'),
+                'amount_cents' => (int) data_get($promosInput, 'discount.amount_cents', 0),
+            ];
+        }
+
+        // ---------- Persist + decrement stock safely ----------
+        return \DB::transaction(function () use ($request, $validated, $userId, $name, $email, $currency, $shippingJson, $billingJson, $promosApplied) {
+
+            $orderItemsForCreate = [];
+            $itemsSnapshot = [];
+            $subtotalCents = 0;
+
+            foreach ($validated['items'] as $row) {
+                $qty = (int) $row['quantity'];
+                $price = (float) $row['price'];
+                $cents = (int) round($price * 100);
+
+                $productId = $row['product_id'] ?? null;
+
+                $productStockId = (int) ($row['product_stock_id'] ?? 0);
+                $colorId = (int) ($row['color_id'] ?? 0);
+                $sizeId = (int) ($row['size_id'] ?? 0);
+
+                $productName = trim((string) ($row['product_name'] ?? ''));
+                $resolvedName = $productName;
+
+                $sku = null;
+                $productThumb = null;
+
+                // ---------- Resolve product + thumb ----------
+                $product = null;
+                if ($productId) {
+                    // lock product row so simple stock updates are safe
+                    $product = Product::query()
+                        ->with(['images'])
+                        ->lockForUpdate()
+                        ->find($productId);
+
+                    if (!$product) {
+                        throw new \Exception("Product not found.");
+                    }
+
+                    if ($resolvedName === '') {
+                        $resolvedName = $product->name;
+                    }
+
+                    $sku = $product->sku ?? null;
+                    $productThumb = $product->images->first()?->image_path;
+                }
+
+                if ($resolvedName === '') {
+                    $resolvedName = 'Custom Item';
+                }
+
+                // ---------- Decrement inventory ----------
+                // 1) If variant provided → decrement ProductStock
+                $didMatrixDecrement = false;
+
+                if ($productStockId > 0) {
+                    $ps = ProductStock::query()
+                        ->whereKey($productStockId)
+                        ->lockForUpdate()
+                        ->first();
+
+                    if (!$ps) {
+                        throw new \Exception("Variant stock not found.");
+                    }
+
+                    // Optional safety: ensure variant belongs to selected product
+                    if ($productId && (int) $ps->product_id !== (int) $productId) {
+                        throw new \Exception("Variant does not belong to selected product.");
+                    }
+
+                    if ((int) $ps->quantity_on_hand < $qty) {
+                        throw new \Exception("Not enough stock for selected variant.");
+                    }
+
+                    $ps->decrement('quantity_on_hand', $qty);
+                    $didMatrixDecrement = true;
+                } elseif ($productId && ($colorId > 0 || $sizeId > 0)) {
+                    // Fallback lookup by product + (color/size)
+                    $q = ProductStock::query()
+                        ->where('product_id', $productId)
+                        ->lockForUpdate();
+
+                    // If your schema allows NULL for "no size" or "no color", handle that:
+                    if ($colorId > 0)
+                        $q->where('color_id', $colorId);
+                    else
+                        $q->whereNull('color_id');
+
+                    if ($sizeId > 0)
+                        $q->where('size_id', $sizeId);
+                    else
+                        $q->whereNull('size_id');
+
+                    $ps = $q->first();
+
+                    if (!$ps) {
+                        throw new \Exception("Variant stock row not found for selected color/size.");
+                    }
+
+                    if ((int) $ps->quantity_on_hand < $qty) {
+                        throw new \Exception("Not enough stock for selected variant.");
+                    }
+
+                    $ps->decrement('quantity_on_hand', $qty);
+                    $productStockId = (int) $ps->id; // keep it for order item snapshot
+                    $didMatrixDecrement = true;
+                }
+
+                // 2) If no matrix decrement happened → treat as simple stock product
+                if (!$didMatrixDecrement && $product) {
+                    if (!is_null($product->stock_quantity)) {
+                        if ((int) $product->stock_quantity < $qty) {
+                            throw new \Exception("Not enough stock for {$product->name}");
+                        }
+                        $product->decrement('stock_quantity', $qty);
+                    }
+                }
+
+                // ---------- Totals ----------
+                $rowSubtotal = $cents * $qty;
+                $subtotalCents += $rowSubtotal;
+
+                // ---------- Prepare order item ----------
+                $orderItemsForCreate[] = [
+                    'product_id' => $productId,
+                    'product_stock_id' => $productStockId ?: null,
+                    'color_id' => $colorId ?: null,
+                    'size_id' => $sizeId ?: null,
+
+                    'name' => $resolvedName,
+                    'sku' => $sku,
+                    'quantity' => $qty,
+                    'unit_price_cents' => $cents,
+                    'subtotal_cents' => $rowSubtotal,
+                    'discount_cents' => 0,
+                    'tax_cents' => 0,
+                    'total_cents' => $rowSubtotal,
+                    'currency' => $currency,
+
+                    'snapshot' => [
+                        'image_url' => $productThumb ? asset('storage/' . $productThumb) : null,
+                        'variant' => [
+                            'product_stock_id' => $productStockId ?: null,
+                            'color_id' => $colorId ?: null,
+                            'size_id' => $sizeId ?: null,
+                        ],
+                    ],
+                ];
+
+                $itemsSnapshot[] = [
+                    'description' => $resolvedName,
+                    'quantity' => $qty,
+                    'amount_subtotal' => $rowSubtotal,
+                    'amount_total' => $rowSubtotal,
+                    'currency' => $currency,
+
+                    'product_id' => (int) ($productId ?? 0),
+                    'product_stock_id' => (int) ($productStockId ?? 0),
+                    'color_id' => (int) ($colorId ?? 0),
+                    'size_id' => (int) ($sizeId ?? 0),
+
+                    'image_url' => $productThumb ? asset('storage/' . $productThumb) : null,
+                ];
+            }
+
+            // Totals (admin-driven)
+            $discountCents = 0;
+            $shippingCents = 0;
+            $taxCents = 0;
+            $totalCents = max(0, $subtotalCents - $discountCents + $shippingCents + $taxCents);
+
+            $order = Order::create([
+                'user_id' => $userId,
+                'coupon_id' => $validated['coupon_id'] ?? null,
+
+                'order_number' => 'ORD-' . now()->format('Ymd') . '-' . strtoupper(\Illuminate\Support\Str::random(6)),
+
+                'stripe_payment_intent' => null,
+                'stripe_customer_id' => null,
+
+                'full_name' => $name ?: $email,
+                'email' => $email,
+                'phone' => null,
+
+                'currency' => $currency,
+                'subtotal_cents' => $subtotalCents,
+                'discount_cents' => $discountCents,
+                'shipping_cents' => $shippingCents,
+                'tax_cents' => $taxCents,
+                'total_cents' => $totalCents,
+
+                'payment_status' => 'pending',
+                'order_status' => 'processing',
+                'payment_method' => $validated['payment_method'],
+
+                'paid_at' => null,
+
+                'shipping_address_json' => $shippingJson,
+                'billing_address_json' => $billingJson,
+
+                'coupon_code' => optional(Coupon::find($validated['coupon_id'] ?? null))->code,
+                'ip_address' => $request->ip(),
+                'user_agent' => substr((string) $request->userAgent(), 0, 1000),
+
+                'snapshot' => $itemsSnapshot,
+                'metadata' => [
+                    'source' => 'admin',
+                    'promos_applied' => $promosApplied,
+                ],
+                'notes' => $validated['notes'] ?? null,
+            ]);
+
+            foreach ($orderItemsForCreate as $li) {
+                OrderItem::create($li + ['order_id' => $order->id]);
+            }
+
+            return redirect()
+                ->route('admin.orders.show', $order)
+                ->with('success', 'Order created successfully.');
+        });
+    }
 
     /* --------------------------------------------------------------
      | Show: order detail
