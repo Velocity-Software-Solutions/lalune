@@ -26,6 +26,7 @@ class ShippingOptionController extends Controller
             'name' => 'required|string|max:255',
             'price' => 'required|numeric|min:0',
             'delivery_time' => 'required|string|max:255',
+            'tax_percentage' => 'nullable|numeric|min:0|max:3',
             'description' => 'nullable|string|max:500',
             'country' => 'required|string|max:100',
             'cities' => 'required|array|min:1',
@@ -36,6 +37,7 @@ class ShippingOptionController extends Controller
             'name' => $request->name,
             'price' => $request->price,
             'delivery_time' => $request->delivery_time,
+            'tax_percentage' => $request->tax_percentage,
             'description' => $request->description,
             'country' => $request->country,
         ]);
@@ -62,6 +64,7 @@ class ShippingOptionController extends Controller
             'name' => 'required|string|max:255',
             'price' => 'required|numeric|min:0',
             'delivery_time' => 'required|string|max:255',
+            'tax_percentage' => 'nullable|numeric|min:0|max:3',
             'description' => 'nullable|string|max:500',
             'country' => 'required|string|max:100',
             'cities' => 'required|array|min:1',

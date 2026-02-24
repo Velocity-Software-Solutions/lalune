@@ -17,6 +17,7 @@ return new class extends Migration {
             $table->string('name');
             $table->decimal('price', 8, 2);
             $table->string('delivery_time');
+            $table->integer('tax_percentage')->nullable();
             $table->text('description')->nullable();
             $table->string('region')->nullable();
             $table->string('country')->nullable()->index();

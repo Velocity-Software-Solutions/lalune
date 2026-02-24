@@ -9,9 +9,9 @@ class ShippingOption extends Model
     //
     protected $fillable = [
         'name',
-        'name_ar',
         'price',
         'delivery_time',
+        'tax_percentage',
         'description',
         'country',
         'region'

@@ -59,11 +59,13 @@
                         'country' => (string) ($o->country ?? ($o['country'] ?? '')),
                         'cities' => collect($o->cities ?? ($o['cities'] ?? []))->map(fn($c) => is_array($c) ? $c['city'] ?? '' : (is_object($c) ? $c->city ?? '' : (string) $c))->filter()->values()->all(),
                         'delivery_time' => (string) ($o->delivery_time ?? ($o['delivery_time'] ?? '')),
+                        'tax_percentage' => $o->tax_percentage ?? ($o['tax_percentage'] ?? null),
                     ],
                 )->values(),
         ) }},
         currency: 'CAD',
         defaultShippingPrice: 15,
+        defaultTaxRate: 0.13,
     
         baseTotal: {{ Js::from($baseTotalAfterDiscount) }},
     
@@ -321,6 +323,7 @@
                             <option :value="code" x-text="name"></option>
                         </template>
                     </select>
+                    <input type="hidden" name="state_name" :value="selectedStateName">
                 </div>
 
                 <div>
@@ -483,8 +486,12 @@
                     </p>
                 @endif
 
-                <p class="text-charcoal">
-                    Tax (13%): CAD {{ number_format($taxAmount, 2) }}
+                <p class="text-charcoal flex items-center justify-between gap-3">
+                    <span>
+                        Tax
+                        <span class="text-gray-500" x-text="`(${Math.round(effectiveTaxRate*100)}%)`"></span>:
+                    </span>
+                    <span class="font-medium text-charcoal" x-text="formatMoney(previewTax)"></span>
                 </p>
 
                 <p class="text-charcoal flex items-center justify-between gap-3">
@@ -504,8 +511,9 @@
                         <span class="font-medium text-charcoal" x-text="formatMoney(previewShipping)"></span>
                     </template>
                 </p>
-                <p class="font-bold text-black tracking-wide">
-                    {{ __('checkout.total') }}: CAD {{ number_format($grandTotal, 2) }}
+                <p class="font-bold text-black tracking-wide flex items-center justify-between gap-3">
+                    <span>{{ __('checkout.total') }}:</span>
+                    <span x-text="formatMoney(previewGrandTotal)"></span>
                 </p>
             </div>
 
@@ -547,14 +555,14 @@
                 shippingOptions: Array.isArray(cfg.shippingOptions) ? cfg.shippingOptions : [],
                 defaultShippingPrice: Number(cfg.defaultShippingPrice ?? 15),
                 currency: cfg.currency || 'CAD',
-
+                defaultTaxRate: Number(cfg.defaultTaxRate ?? 0.13),
+                baseTotal: Number(cfg.baseTotal || 0),
                 country: cfg.initialCountry || '',
                 state: cfg.initialState || '',
                 city: cfg.initialCity || '',
 
                 hasFreeShipping: !!cfg.hasFreeShipping,
                 selectedOptionId: cfg.initialShippingId ? String(cfg.initialShippingId) : null,
-
                 // ===== Helpers =====
                 statesForCountry() {
                     return this.countries?.[this.country] || {}; // code => name
@@ -670,6 +678,31 @@
                 get previewShipping() {
                     if (this.hasFreeShipping) return 0;
                     return this.selectedShipping ? Number(this.selectedShipping.price || 0) : this.defaultShippingPrice;
+                },
+
+                // ✅ tax % can come from shipping option (if not null)
+                normalizeTaxRate(v) {
+                    if (v === null || v === undefined || v === '') return null;
+                    const n = Number(v);
+                    if (!isFinite(n)) return null;
+                    // if user stored 13 -> treat as percent
+                    if (n > 1) return n / 100;
+                    // if stored 0.13 -> already a rate
+                    return n;
+                },
+
+                get effectiveTaxRate() {
+                    const optRate = this.normalizeTaxRate(this.selectedShipping?.tax_percentage);
+                    return optRate !== null && optRate !== 0 ? optRate : this.defaultTaxRate;
+                },
+
+                get previewTax() {
+                    // tax on items AFTER discount (your baseTotal)
+                    return Number((this.baseTotal * this.effectiveTaxRate).toFixed(2));
+                },
+
+                get previewGrandTotal() {
+                    return Number((this.baseTotal + this.previewTax + this.previewShipping).toFixed(2));
                 },
 
                 onLocationChange(resetState = false) {

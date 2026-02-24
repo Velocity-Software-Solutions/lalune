@@ -123,6 +123,7 @@ class CheckoutController extends Controller
             'country' => 'required|string',
             'city' => 'required|string|max:255',
             'state' => 'required|string|max:255',
+            'state_name' => 'nullable|string|max:255',
             'shipping_address' => 'required|string',
             'billing_address' => 'nullable|string',
         ]);
@@ -368,62 +369,74 @@ class CheckoutController extends Controller
             $itemsSubtotalCents += $lineCents;
         }
 
-        // =======================
-// Shipping (server-side truth)
-// "cities" in DB = STATES
-// =======================
         $country = trim((string) $request->input('country', ''));
-        $state = trim((string) $request->input('state', ''));
+        $stateCode = trim((string) $request->input('state', ''));
+        $stateCodeLower = mb_strtolower($stateCode);
 
-        $stateLower = mb_strtolower($state);
+        // ✅ comes from the hidden input
+        $stateName = trim((string) $request->input('state_name', ''));
+        $stateNameLower = mb_strtolower($stateName);
 
-        // Load shipping options + their "states" list (stored as cities)
-        $shippingOptions = ShippingOption::query()
-            ->where('status', 1)
-            ->where('country', $country)
-            ->with(['cities:id,shipping_option_id,city']) // <-- change to your relation name if needed
-            ->get();
+        // fallback if state_name missing (won’t match Ontario, but keeps safe)
+        if ($stateNameLower === '') {
+            $stateNameLower = $stateCodeLower;
+        }
 
-        // Normalize + match
-        $matched = $shippingOptions
-            ->map(function ($o) {
-                $states = $o->cityItems?->pluck('city')->filter()->values()->all() ?? []; // these are STATES
-                $statesLower = array_map(fn($s) => mb_strtolower(trim((string) $s)), $states);
+        // what user selected
+        $requestedShippingIdRaw = $request->input('shipping_option_id'); // can be "fallback"
+        $requestedShippingId = is_numeric($requestedShippingIdRaw) ? (int) $requestedShippingIdRaw : null;
 
-                return [
-                    'id' => (int) $o->id,
-                    'name' => (string) $o->name,
-                    'price_cents' => (int) round(((float) $o->price) * 100),
-                    'states_lower' => $statesLower,              // [] => country-wide
-                    'is_country_wide' => count($statesLower) === 0,
-                    'delivery_time' => (string) ($o->delivery_time ?? ''),
+        // Load the SELECTED shipping option (only) for that country
+        $selectedOption = null;
+        if ($requestedShippingId) {
+            $selectedOption = ShippingOption::query()
+                ->where('id', $requestedShippingId)
+                ->where('status', 1)
+                ->where('country', $country)
+                ->with(['cities:id,shipping_option_id,city'])
+                ->first();
+        }
+
+        // Validate selected option belongs to the state (or is country-wide)
+        $shippingPicked = null;
+
+        if ($selectedOption) {
+            $states = $selectedOption->cities?->pluck('city')->filter()->values()->all() ?? [];
+            $statesLower = array_map(fn($s) => mb_strtolower(trim((string) $s)), $states);
+
+            $isCountryWide = count($statesLower) === 0;
+
+            $isValidForState = $isCountryWide
+                || in_array($stateCodeLower, $statesLower, true)
+                || in_array($stateNameLower, $statesLower, true);
+
+            if ($isValidForState) {
+                $shippingPicked = [
+                    'id' => (int) $selectedOption->id,
+                    'name' => (string) $selectedOption->name,
+                    'price_cents' => (int) round(((float) $selectedOption->price) * 100),
+                    'tax_percentage' => $selectedOption->tax_percentage, // ✅ THIS is what we need
                 ];
-            })
-            ->filter(function ($o) use ($stateLower) {
-                return $o['is_country_wide'] || ($stateLower !== '' && in_array($stateLower, $o['states_lower'], true));
-            })
-            ->values();
+            }
+        }
 
-        // Decide shipping cents:
-// - If promo free shipping => 0
-// - Else if matched => pick cheapest (or pick first, your call)
-// - Else fallback 15 CAD
-        $shippingCentsDefault = 1500; // 15.00 CAD
-        $matchedShippingCents = $matched->isNotEmpty()
-            ? (int) $matched->min('price_cents') // cheapest match
-            : null;
+        // If free shipping promo, shipping is 0 but we can still use selected option for tax rules
+        $shippingCentsDefault = 1500;
 
         $shippingCents = !empty($promos['shipping'])
             ? 0
-            : ($matchedShippingCents ?? $shippingCentsDefault);
+            : ($shippingPicked ? (int) $shippingPicked['price_cents'] : $shippingCentsDefault);
 
-        // Optional: keep a name/id for metadata
-        $shippingPicked = null;
-        if (empty($promos['shipping']) && $matched->isNotEmpty()) {
-            // if you chose cheapest, pick the row that has it
-            $min = (int) $matched->min('price_cents');
-            $shippingPicked = $matched->firstWhere('price_cents', $min);
+        // =======================
+// Tax: use shippingPicked.tax_percentage if present, else default
+// =======================
+        $taxRate = 0.13;
+
+        if ($shippingPicked && $shippingPicked['tax_percentage'] !== null && $shippingPicked['tax_percentage'] !== '') {
+            $tp = (float) $shippingPicked['tax_percentage'];
+            $taxRate = $tp > 1 ? ($tp / 100) : $tp;
         }
+
 
         $discountCents = 0;
         if (!empty($promos['discount'])) {
@@ -442,7 +455,6 @@ class CheckoutController extends Controller
             $discountCents = min($discountCents, $itemsSubtotalCents);
         }
 
-        $taxRate = 0.13;
         $itemsAfterDiscountCents = max(0, $itemsSubtotalCents - $discountCents);
         $taxCents = (int) round($itemsAfterDiscountCents * $taxRate);
 
@@ -490,7 +502,7 @@ class CheckoutController extends Controller
             $adjustedLineItems[] = [
                 'price_data' => [
                     'currency' => 'cad',
-                    'product_data' => ['name' => 'Tax (13%)'],
+                    'product_data' => ['name' => 'Tax (' . (string) round($taxRate * 100) . '%)'],
                     'unit_amount' => $taxCents,
                 ],
                 'quantity' => 1,
@@ -554,7 +566,7 @@ class CheckoutController extends Controller
             'promo_discount_percent' => (string) ($promos['discount']['percent'] ?? $promos['discount']['value'] ?? ''),
             'promo_discount_amount' => (string) ($discountCents ?? 0),
 
-            'tax_rate_percent' => '13',
+            'tax_rate_percent' => (string) round($taxRate * 100),
             'tax_amount_cents' => (string) $taxCents,
 
             'reservation_ids' => $reservationIdsCsv,

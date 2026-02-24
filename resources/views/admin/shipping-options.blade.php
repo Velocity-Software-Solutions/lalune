@@ -61,6 +61,7 @@
                         name_ar: @js($option->name_ar),
                         price: @js($option->price),
                         delivery_time: @js($option->delivery_time),
+                        tax_percentage: @js($option->tax_percentage),
                         description: @js($option->description),
                         country: @js($option->country),
                         cities: @js($option->cities ?? [])
@@ -129,21 +130,28 @@
                                     <input name="name" x-model="name" class="form-input w-full  border rounded">
                                 </label>
                                 <label class="block">
-                                    <span class="text-xs font-medium text-gray-600 dark:text-gray-300">Arabic Name</span>
-                                    <input name="name_ar" x-model="name_ar" class="form-input w-full  border rounded">
-                                </label>
-                                <label class="block">
                                     <span class="text-xs font-medium text-gray-600 dark:text-gray-300">Price</span>
                                     <input name="price" x-model="price" type="number" step="0.01"
                                         class="form-input w-full  border rounded">
                                 </label>
                                 <label class="block">
                                     <span class="text-xs font-medium text-gray-600 dark:text-gray-300">Delivery Time</span>
-                                    <input name="delivery_time" x-model="delivery_time" class="form-input w-full  border rounded">
+                                    <input name="delivery_time" x-model="delivery_time"
+                                        class="form-input w-full  border rounded">
+                                </label>
+                                <label class="block">
+                                    <span class="text-xs font-medium text-gray-600 dark:text-gray-300">Tax Percentage</span>
+                                    <div class="flex">
+                                        <input name="tax_percentage" x-model="tax_percentage"
+                                            class="form-input w-full border rounded-l-md">
+                                        <span
+                                            class="flex justify-center items-center w-10 bg-black text-white text-center rounded-r-md">%</span>
+                                    </div>
                                 </label>
                                 <label class="sm:col-span-2 block">
                                     <span class="text-xs font-medium text-gray-600 dark:text-gray-300">Description</span>
-                                    <input name="description" x-model="description" class="form-input w-full  border rounded">
+                                    <input name="description" x-model="description"
+                                        class="form-input w-full  border rounded">
                                 </label>
 
                                 <label class="block">
@@ -228,11 +236,21 @@
                     </label>
                     <label class="block">
                         <span class="text-xs font-medium text-gray-600 dark:text-gray-300">Price</span>
-                        <input name="price" x-model="price" type="number" step="0.01" class="form-input w-full  border rounded">
+                        <input name="price" x-model="price" type="number" step="0.01"
+                            class="form-input w-full  border rounded">
                     </label>
                     <label class="block">
                         <span class="text-xs font-medium text-gray-600 dark:text-gray-300">Delivery Time</span>
                         <input name="delivery_time" x-model="delivery_time" class="form-input w-full  border rounded">
+                    </label>
+                    <label class="block">
+                        <span class="text-xs font-medium text-gray-600 dark:text-gray-300">Tax Percentage</span>
+                        <div class="flex">
+                            <input name="tax_percentage" x-model="tax_percentage"
+                                class="form-input w-full border rounded-l-md">
+                            <span
+                                class="flex justify-center items-center w-10 bg-black text-white text-center rounded-r-md">%</span>
+                        </div>
                     </label>
                     <label class="sm:col-span-2 block">
                         <span class="text-xs font-medium text-gray-600 dark:text-gray-300">Description</span>
@@ -298,6 +316,7 @@
                 name_ar: payload.name_ar || '',
                 price: payload.price || '',
                 delivery_time: payload.delivery_time || '',
+                tax_percentage: payload.tax_percentage || '',
                 description: payload.description || '',
                 country: payload.country || '',
                 // Normalize incoming cities:
