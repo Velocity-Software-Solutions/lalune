@@ -40,12 +40,18 @@
         // Shipping (PHP display only; actual shipping submitted is from Alpine hidden inputs)
         $shippingAfter = $hasFreeShipping ? 0.0 : $shippingBefore;
 
-        // ✅ Apply 13% tax on items subtotal after discount (before shipping)
-        $taxRate = 0.13;
-        $taxAmount = round($baseTotalAfterDiscount * $taxRate, 2);
+        // =========================
+        // TAX CHANGE (PHP):
+        // We NO LONGER calculate tax on this page.
+        // Tax will be calculated on the Stripe payment page.
+        // =========================
+        $taxRate = 0.0;   // (unused now)
+        $taxAmount = 0.0; // (unused now)
 
-        // ✅ Final grand total (PHP display only; actual total can differ if user picks different shipping)
-        $grandTotal = $baseTotalAfterDiscount + $taxAmount + $shippingAfter;
+        // =========================
+        // TAX CHANGE (Grand total here is before tax)
+        // =========================
+        $grandTotal = $baseTotalAfterDiscount + $shippingAfter;
     @endphp
 
     <div class="max-w-5xl px-4 py-10 mx-auto sm:px-6 lg:px-8 min-h-screen bg-white" x-data="checkoutState({
@@ -65,13 +71,18 @@
         ) }},
         currency: 'CAD',
         defaultShippingPrice: 15,
-        defaultTaxRate: 0.13,
-    
+
+        // =========================
+        // TAX CHANGE (Alpine config):
+        // We do not compute tax on this page.
+        // =========================
+        defaultTaxRate: 0,
+
         baseTotal: {{ Js::from($baseTotalAfterDiscount) }},
-    
+
         shippingBefore: {{ Js::from($shippingBefore) }},
         hasFreeShipping: {{ Js::from($hasFreeShipping) }},
-    
+
         initialCountry: '{{ old('country') ?: array_key_first($countries) ?? '' }}',
         initialState: '{{ old('state') }}',
         initialShippingId: '{{ old('shipping_option_id') }}',
@@ -486,13 +497,18 @@
                     </p>
                 @endif
 
-                <p class="text-charcoal flex items-center justify-between gap-3">
-                    <span>
-                        Tax
-                        <span class="text-gray-500" x-text="`(${Math.round(effectiveTaxRate*100)}%)`"></span>:
-                    </span>
-                    <span class="font-medium text-charcoal" x-text="formatMoney(previewTax)"></span>
-                </p>
+                {{-- =========================
+                    TAX CHANGE (UI):
+                    Show an info note instead of computing / showing tax amount
+                ========================== --}}
+                <div class="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                    <p class="text-sm text-gray-800 flex items-start gap-2">
+                        <span class="material-icons-outlined text-gray-600 mt-[1px]">info</span>
+                        <span>
+                            Taxes are finalized on the secure Stripe payment page based on your billing details.
+                        </span>
+                    </p>
+                </div>
 
                 <p class="text-charcoal flex items-center justify-between gap-3">
                     <span>{{ __('checkout.shipping') }}:</span>
@@ -511,9 +527,18 @@
                         <span class="font-medium text-charcoal" x-text="formatMoney(previewShipping)"></span>
                     </template>
                 </p>
+
+                {{-- =========================
+                    TAX CHANGE (UI):
+                    Total shown here is BEFORE tax (tax shown on Stripe)
+                ========================== --}}
                 <p class="font-bold text-black tracking-wide flex items-center justify-between gap-3">
                     <span>{{ __('checkout.total') }}:</span>
                     <span x-text="formatMoney(previewGrandTotal)"></span>
+                </p>
+
+                <p class="text-[12px] text-gray-500">
+                    Total above excludes tax. You’ll see the final total (including taxes) on Stripe.
                 </p>
             </div>
 
@@ -555,7 +580,13 @@
                 shippingOptions: Array.isArray(cfg.shippingOptions) ? cfg.shippingOptions : [],
                 defaultShippingPrice: Number(cfg.defaultShippingPrice ?? 15),
                 currency: cfg.currency || 'CAD',
-                defaultTaxRate: Number(cfg.defaultTaxRate ?? 0.13),
+
+                // =========================
+                // TAX CHANGE (Alpine):
+                // We do NOT calculate tax on this page.
+                // =========================
+                defaultTaxRate: 0,
+
                 baseTotal: Number(cfg.baseTotal || 0),
                 country: cfg.initialCountry || '',
                 state: cfg.initialState || '',
@@ -680,29 +711,20 @@
                     return this.selectedShipping ? Number(this.selectedShipping.price || 0) : this.defaultShippingPrice;
                 },
 
-                // ✅ tax % can come from shipping option (if not null)
-                normalizeTaxRate(v) {
-                    if (v === null || v === undefined || v === '') return null;
-                    const n = Number(v);
-                    if (!isFinite(n)) return null;
-                    // if user stored 13 -> treat as percent
-                    if (n > 1) return n / 100;
-                    // if stored 0.13 -> already a rate
-                    return n;
-                },
+                // =========================
+                // TAX CHANGE (Alpine):
+                // Disable any tax math
+                // =========================
+                normalizeTaxRate(v) { return null; },
+                get effectiveTaxRate() { return 0; },
+                get previewTax() { return 0; },
 
-                get effectiveTaxRate() {
-                    const optRate = this.normalizeTaxRate(this.selectedShipping?.tax_percentage);
-                    return optRate !== null && optRate !== 0 ? optRate : this.defaultTaxRate;
-                },
-
-                get previewTax() {
-                    // tax on items AFTER discount (your baseTotal)
-                    return Number((this.baseTotal * this.effectiveTaxRate).toFixed(2));
-                },
-
+                // =========================
+                // TAX CHANGE (Alpine):
+                // Grand total is base + shipping only (tax shown on Stripe)
+                // =========================
                 get previewGrandTotal() {
-                    return Number((this.baseTotal + this.previewTax + this.previewShipping).toFixed(2));
+                    return Number((this.baseTotal + this.previewShipping).toFixed(2));
                 },
 
                 onLocationChange(resetState = false) {

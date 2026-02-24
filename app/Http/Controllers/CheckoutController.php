@@ -127,7 +127,6 @@ public function process(Request $request)
         'shipping_address' => 'required|string',
         'billing_address' => 'nullable|string',
 
-        // shipping selection from your checkout UI
         'shipping_option_id' => 'nullable|integer|exists:shipping_options,id',
     ]);
 
@@ -191,7 +190,6 @@ public function process(Request $request)
             }
         }
 
-        // fallback product-level discount/price
         if ($p->discount_price !== null && (float) $p->discount_price > 0) {
             return (float) $p->discount_price;
         }
@@ -221,7 +219,7 @@ public function process(Request $request)
             $variant = $p->stock->firstWhere('id', (int) $line['product_stock_id']);
             if ($variant) {
                 $line['color_id'] = (int) ($variant->color_id ?? 0);
-                $line['size_id'] = (int) ($variant->size_id ?? 0);
+                $line['size_id']  = (int) ($variant->size_id ?? 0);
             }
         }
 
@@ -229,7 +227,6 @@ public function process(Request $request)
             $colorId = (int) ($line['color_id'] ?? 0);
             $sizeId  = (int) ($line['size_id'] ?? 0);
 
-            // legacy mapping
             if (!$colorId && !empty($line['color'])) {
                 $hex = strtoupper((string) $line['color']);
                 $colorId = (int) optional($p->colors->firstWhere('color_code', $hex))->id;
@@ -261,7 +258,6 @@ public function process(Request $request)
             }
         }
 
-        // Stock available
         $available = $variant ? (int) $variant->quantity_on_hand : (int) $p->stock_quantity;
 
         if ($available <= 0) {
@@ -277,7 +273,6 @@ public function process(Request $request)
             $changes[] = "Updated “" . (($line['name'] ?? 'item') ?: 'item') . "” to {$available} (limited stock).";
         }
 
-        // Price validation using price matrix
         $colorId = (int) ($line['color_id'] ?? 0);
         $sizeId  = (int) ($line['size_id'] ?? 0);
 
@@ -323,7 +318,7 @@ public function process(Request $request)
     $cart = $result['cart'] ?? $cart;
     session()->put('cart', $cart);
 
-    // ---- Normalize promos (keep your logic)
+    // ---- Normalize promos
     $promosRaw = session('promos', []);
     $promosRaw = is_array($promosRaw) ? $promosRaw : [];
     $shippingPromo = collect($promosRaw)->first(fn($e) => ($e['discount_type'] ?? null) === 'shipping');
@@ -356,7 +351,7 @@ public function process(Request $request)
         $itemsSubtotalCents += $lineCents;
     }
 
-    // ---- Discount (keep your logic) and build adjusted line items
+    // ---- Discount (keep your logic)
     $discountCents = 0;
     if (!empty($promos['discount'])) {
         $dp = $promos['discount'];
@@ -374,7 +369,7 @@ public function process(Request $request)
         $discountCents = min($discountCents, $itemsSubtotalCents);
     }
 
-    // Stripe line_items (discount pro-rata) — NO manual tax/shipping items
+    // Stripe line_items (discount pro-rata)
     $adjustedLineItems = [];
     $remainingDiscount = $discountCents;
     $lastIndex = array_key_last($items);
@@ -413,9 +408,9 @@ public function process(Request $request)
         ];
     }
 
-    // ---- Shipping option (validate your selected shipping option) -> convert to Stripe shipping rate
-    $country = trim((string) $request->input('country', ''));
-    $stateCode = trim((string) $request->input('state', ''));
+    // ---- Shipping option (your DB)
+    $country = strtoupper(trim((string) $request->input('country', 'CA')));
+    $stateCode = strtoupper(trim((string) $request->input('state', '')));
 
     $requestedShippingId = $request->filled('shipping_option_id')
         ? (int) $request->input('shipping_option_id')
@@ -431,16 +426,51 @@ public function process(Request $request)
             ->first();
     }
 
-    // minimal validation (you already do deeper validation elsewhere)
     $shippingName = $selectedOption?->name ?: 'Shipping';
     $shippingCentsDefault = 1500;
 
-    // free shipping promo support
     $shippingCents = !empty($promos['shipping'])
         ? 0
         : (int) round(((float) ($selectedOption?->price ?? ($shippingCentsDefault / 100))) * 100);
 
-    // ---- Metadata + cart snapshot
+    // ---- Prefill addresses via Stripe Customer (NOT via Checkout params)
+    $shippingLine1 = trim((string) $request->input('shipping_address', ''));
+    $billingLine1  = trim((string) ($request->input('billing_address') ?: $shippingLine1));
+
+    $countryRaw = trim((string) $request->input('country', ''));
+
+// Map common labels to ISO2 for Stripe
+$countryMap = [
+    'CANADA' => 'CA',
+    'CA' => 'CA',
+    'UNITED STATES' => 'US',
+    'USA' => 'US',
+    'US' => 'US',
+];
+
+$countryIso = $countryMap[strtoupper($countryRaw)] ?? strtoupper($countryRaw);
+
+// Safety: if still not 2 letters, default
+if (strlen($countryIso) !== 2) {
+    $countryIso = 'CA';
+}
+
+    $shippingAddressForStripe = array_filter([
+        'line1'   => $shippingLine1 ?: null,
+        'city'    => trim((string) $request->input('city', '')) ?: null,
+        'state'   => $stateCode ?: null,
+        'country' => $countryIso ?: null,
+        // 'postal_code' => trim((string) $request->input('postal_code', '')) ?: null,
+    ], fn($v) => $v !== null && $v !== '');
+
+    $billingAddressForStripe = array_filter([
+        'line1'   => $billingLine1 ?: null,
+        'city'    => trim((string) $request->input('city', '')) ?: null,
+        'state'   => $stateCode ?: null,
+        'country' => $country ?: null,
+    ], fn($v) => $v !== null && $v !== '');
+
+    // ---- Metadata + cart snapshot (keep yours)
     $reservationIdsCsv = implode(',', (array) ($result['reservation_ids'] ?? []));
     $cartSnapshot = collect($cart)->map(function ($it) {
         return [
@@ -491,21 +521,62 @@ public function process(Request $request)
         'cart_snapshot' => json_encode($cartSnapshot),
     ], fn($v) => $v !== null && $v !== '');
 
-    // ---- Stripe Checkout (Automatic Tax)
+    // ---- Stripe Checkout
+    $stripe = new \Stripe\StripeClient(env('STRIPE_SECRET'));
+
+    // Create/update a customer so Stripe Checkout is prefilled
+    $customerId = null;
+
+    if (auth()->check() && !empty(auth()->user()->stripe_id)) {
+        $customerId = auth()->user()->stripe_id;
+
+        $stripe->customers->update($customerId, [
+            'name' => (string) $request->input('full_name'),
+            'phone' => (string) $request->input('phone'),
+            'address' => $billingAddressForStripe ?: null,
+            'shipping' => [
+                'name' => (string) $request->input('full_name'),
+                'phone' => (string) $request->input('phone'),
+                'address' => $shippingAddressForStripe,
+            ],
+        ]);
+    } else {
+        // If you want guests ALSO to be prefilled, create the customer here:
+        $customer = $stripe->customers->create([
+            'email' => $request->filled('email') ? $request->input('email') : null,
+            'name' => (string) $request->input('full_name'),
+            'phone' => (string) $request->input('phone'),
+            'address' => $billingAddressForStripe ?: null,
+            'shipping' => [
+                'name' => (string) $request->input('full_name'),
+                'phone' => (string) $request->input('phone'),
+                'address' => $shippingAddressForStripe,
+            ],
+            'metadata' => [
+                'source' => 'checkout_prefill',
+            ],
+        ]);
+
+        $customerId = $customer->id;
+    }
+
     $params = [
         'mode' => 'payment',
         'line_items' => $adjustedLineItems,
 
-        // ✅ Stripe calculates tax (do NOT add tax line item)
+        // Stripe calculates tax
         'automatic_tax' => ['enabled' => true],
 
-        // ✅ Stripe must collect address to compute tax reliably
+        // Stripe collects/validates address for tax (will be prefilled from customer)
         'shipping_address_collection' => [
-            'allowed_countries' => ['CA'], // add more if you ship elsewhere
+            'allowed_countries' => [$countryIso ?: 'CA'],
         ],
         'billing_address_collection' => 'required',
 
-        // ✅ Charge shipping via Stripe (not as a line item)
+        // optional: Stripe can collect phone (prefills from customer usually)
+        'phone_number_collection' => ['enabled' => true],
+
+        // Charge shipping via Stripe
         'shipping_options' => [
             [
                 'shipping_rate_data' => [
@@ -519,7 +590,16 @@ public function process(Request $request)
             ],
         ],
 
-        // Helpful: keep your app metadata
+        // Attach the customer we updated/created
+        'customer' => $customerId,
+
+        // Save any changes the user makes in Checkout back to the customer
+        'customer_update' => [
+            'address' => 'auto',
+            'shipping' => 'auto',
+            'name' => 'auto',
+        ],
+
         'metadata' => $allMeta,
         'payment_intent_data' => ['metadata' => $allMeta],
 
@@ -527,26 +607,10 @@ public function process(Request $request)
         'cancel_url' => route('checkout.index'),
     ];
 
-    if (auth()->check() && !empty(auth()->user()->stripe_id)) {
-        $params['customer'] = auth()->user()->stripe_id;
-        $params['customer_update'] = [
-            'address' => 'auto',
-            'shipping' => 'auto',
-            'name' => 'auto',
-        ];
-    } else {
-        $params['customer_creation'] = 'always';
-        if ($request->filled('email')) {
-            $params['customer_email'] = $request->input('email');
-        }
-    }
-
-    $stripe = new \Stripe\StripeClient(env('STRIPE_SECRET'));
     $session = $stripe->checkout->sessions->create($params);
 
     return redirect()->away($session->url);
 }
-
     public function confirmation(Request $request)
     {
         $sessionId = $request->query('session_id');
