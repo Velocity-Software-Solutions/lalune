@@ -620,8 +620,8 @@
                                 <h3 class="text-lg font-semibold text-charcoal">
                                     {{ app()->getLocale() === 'ar' && $sp->name_ar ? $sp->name_ar : $sp->name }}
                                 </h3>
-                                <p class="mt-1 text-gray-600">
-                                    {!! Str::limit(app()->getLocale() === 'ar' && $sp->description_ar ? $sp->description_ar : $sp->description, 80) !!}
+                                <p class="mt-1 text-gray-600 line-clamp-3">
+                                    {!!  $sp->description !!}
                                 </p>
                                 <div class="flex items-center justify-between mt-2">
                                     <span class="text-xl font-bold text-gray-600">
