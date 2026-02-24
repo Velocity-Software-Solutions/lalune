@@ -602,10 +602,10 @@
                     </h1>
                 @endif
 
-                <div class="flex flex-wrap gap-5 m-5">
+                <div class="grid grid-cols-1 gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3 border-b border-black/10 pb-8 mx-5">
                     @foreach ($smiliarProducts as $sp)
                         <div
-                            class="overflow-hidden !transition bg-white rounded-lg shadow-md !duration-500 hover:shadow-2xl fade-up w-[250px]">
+                            class="product-box flex flex-col justify-between px-2 py-5 transition rounded-2xl duration-500 hover:shadow-2xl hover:-translate-y-2 hover:border-black/5 bg-white">
                             @if ($sp->images->count())
                                 <div
                                     class="relative flex justify-center items-center w-full h-[300px] overflow-hidden rounded-t-md p-1">
@@ -620,8 +620,8 @@
                                 <h3 class="text-lg font-semibold text-charcoal">
                                     {{ app()->getLocale() === 'ar' && $sp->name_ar ? $sp->name_ar : $sp->name }}
                                 </h3>
-                                <p class="mt-1 text-gray-600 w-min">
-                                    {{ Str::limit(app()->getLocale() === 'ar' && $sp->description_ar ? $sp->description_ar : $sp->description, 80) }}
+                                <p class="mt-1 text-gray-600">
+                                    {!! Str::limit(app()->getLocale() === 'ar' && $sp->description_ar ? $sp->description_ar : $sp->description, 80) !!}
                                 </p>
                                 <div class="flex items-center justify-between mt-2">
                                     <span class="text-xl font-bold text-gray-600">
