@@ -66,7 +66,7 @@ class GeneralSetupController extends Controller
             if (!empty($setup->background_image)) {
                 Storage::disk('public')->delete($setup->background_image);
             }
-            $setup->background_image == null;
+            $setup->background_image = null;
             $setup->update();
         }
 
@@ -81,7 +81,7 @@ class GeneralSetupController extends Controller
             if (!empty($setup->size_chart)) {
                 Storage::disk('public')->delete($setup->size_chart);
             }
-            $setup->size_chart == null;
+            $setup->size_chart = null;
             $setup->update();
         }
 
