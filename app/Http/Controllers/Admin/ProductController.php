@@ -29,7 +29,7 @@ class ProductController extends Controller
         return view('admin.products.create', compact('categories', 'collections'));
     }
 
- public function store(Request $request)
+public function store(Request $request)
 {
     $rules = [
         'name' => 'required|string|max:255',
@@ -69,13 +69,15 @@ class ProductController extends Controller
         'stock_matrix.*' => 'array',
         'stock_matrix.*.*' => 'integer|min:0',
 
-        // ✅ NEW: price matrix
-        // price_matrix[colorKey][sizeKey][price|discounted_price]
+        // price matrix
         'price_matrix' => 'sometimes|array',
         'price_matrix.*' => 'array',
         'price_matrix.*.*' => 'array',
         'price_matrix.*.*.price' => 'nullable|numeric|min:0',
         'price_matrix.*.*.discounted_price' => 'nullable|numeric|min:0',
+
+        // size chart
+        'size_chart' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:4096',
     ];
 
     $messages = [
@@ -124,12 +126,17 @@ class ProductController extends Controller
         'stock_matrix.*.*.integer' => 'Stock quantities in the matrix must be whole numbers.',
         'stock_matrix.*.*.min' => 'Stock quantities in the matrix cannot be negative.',
 
-        // ✅ NEW price matrix
+        // Price matrix
         'price_matrix.array' => 'The price matrix must be a grid.',
         'price_matrix.*.*.price.numeric' => 'Each option price must be a number.',
         'price_matrix.*.*.price.min' => 'Option price cannot be negative.',
         'price_matrix.*.*.discounted_price.numeric' => 'Each option discount must be a number.',
         'price_matrix.*.*.discounted_price.min' => 'Option discount cannot be negative.',
+
+        // Size chart
+        'size_chart.image' => 'The size chart must be an image.',
+        'size_chart.mimes' => 'The size chart must be a JPG, JPEG, PNG, or WEBP image.',
+        'size_chart.max' => 'The size chart must be 4 MB or smaller.',
     ];
 
     $attributes = [
@@ -152,10 +159,11 @@ class ProductController extends Controller
         'stock_matrix' => 'stock matrix',
         'stock_matrix.*.*' => 'stock quantity',
 
-        // ✅ NEW
         'price_matrix' => 'price matrix',
         'price_matrix.*.*.price' => 'option price',
         'price_matrix.*.*.discounted_price' => 'option discounted price',
+
+        'size_chart' => 'size chart',
     ];
 
     $validated = $request->validate($rules, $messages, $attributes);
@@ -166,6 +174,7 @@ class ProductController extends Controller
         $baseSlug = Str::slug($validated['slug'] ?? $validated['name']);
         $slug = $baseSlug;
         $i = 1;
+
         while (Product::where('slug', $slug)->exists()) {
             $slug = "{$baseSlug}-{$i}";
             $i++;
@@ -179,20 +188,25 @@ class ProductController extends Controller
             'description_ar' => $validated['description_ar'] ?? null,
             'price' => $validated['price'],
             'discount_price' => $validated['discount_price'] ?? null,
-            'stock_quantity' => $validated['stock_quantity'] ?? 0, // may be replaced by matrix sum
+            'stock_quantity' => $validated['stock_quantity'] ?? 0,
             'status' => $request->boolean('status') ? 1 : 0,
             'category_id' => $validated['category_id'],
             'collection_id' => $validated['collection_id'] ?? null,
+            'size_chart' => $request->hasFile('size_chart')
+                ? $request->file('size_chart')->store('products/size-charts', 'public')
+                : null,
         ]);
 
         // 2) Sizes -> index → id mapping
         $sizeIdByIndex = [];
         foreach ((array) $request->input('sizes', []) as $idx => $sizeName) {
             $sizeName = trim((string) $sizeName);
+
             if ($sizeName === '') {
                 $sizeIdByIndex[$idx] = null;
                 continue;
             }
+
             $size = $product->sizes()->create(['size' => $sizeName]);
             $sizeIdByIndex[$idx] = $size->id;
         }
@@ -213,6 +227,7 @@ class ProductController extends Controller
                 'name' => $name,
                 'color_code' => $code,
             ]);
+
             $colorIdByIndex[$idx] = $row->id;
         }
 
@@ -220,6 +235,7 @@ class ProductController extends Controller
         $files = (array) $request->file('images', []);
         $imageCodesPri = (array) $request->input('image_color_codes', []);
         $imageCodesAlt = (array) $request->input('image_color_hexes', []);
+
         foreach ($files as $i => $file) {
             if (!$file) continue;
 
@@ -246,7 +262,6 @@ class ProductController extends Controller
 
             foreach ($row as $siKey => $qtyRaw) {
                 $qty = max(0, (int) $qtyRaw);
-
                 $sizeId = $siKey === 'na' ? null : ($sizeIdByIndex[(int) $siKey] ?? null);
 
                 if (is_null($colorId) && is_null($sizeId)) continue;
@@ -270,10 +285,8 @@ class ProductController extends Controller
             $product->update(['stock_quantity' => $totalFromMatrix]);
         }
 
-        // 6) ✅ Price matrix (optional)
-        // IMPORTANT: rename prices() to your real relation
+        // 6) Price matrix
         if (method_exists($product, 'prices')) {
-
             $pm = (array) $request->input('price_matrix', []);
             $hasPriceMatrix = $request->has('price_matrix');
 
@@ -288,15 +301,13 @@ class ProductController extends Controller
 
                         $sizeId = $siKey === 'na' ? null : ($sizeIdByIndex[(int) $siKey] ?? null);
 
-                        // ignore invalid mappings
                         if (is_null($colorId) && is_null($sizeId)) continue;
                         if ($ciKey !== 'na' && is_null($colorId)) continue;
                         if ($siKey !== 'na' && is_null($sizeId)) continue;
 
                         $price = $cell['price'] ?? null;
-                        $disc  = $cell['discounted_price'] ?? null;
+                        $disc = $cell['discounted_price'] ?? null;
 
-                        // Store only if at least one value exists
                         $hasAny = ($price !== null && $price !== '') || ($disc !== null && $disc !== '');
                         if (!$hasAny) continue;
 
@@ -317,7 +328,6 @@ class ProductController extends Controller
             ->with('success', 'Product created successfully!');
     });
 }
-
 
 
     public function edit(Product $product)
@@ -364,7 +374,7 @@ public function update(Request $request, Product $product)
 
         // new images
         'images' => 'sometimes|array',
-        'images.*' => 'nullable|image|max:4096', // 4 MB per image
+        'images.*' => 'nullable|image|max:4096',
         'image_color_hexes' => 'sometimes|array',
         'image_color_hexes.*' => ['nullable', 'regex:/^#([0-9A-Fa-f]{6})$/'],
         'new_image_uids' => 'sometimes|array',
@@ -379,17 +389,19 @@ public function update(Request $request, Product $product)
         'stock_matrix.*' => 'array',
         'stock_matrix.*.*' => 'integer|min:0',
 
-        // ✅ NEW: price matrix
-        // price_matrix[colorKey][sizeKey][price|discounted_price]
+        // price matrix
         'price_matrix' => 'sometimes|array',
         'price_matrix.*' => 'array',
         'price_matrix.*.*' => 'array',
         'price_matrix.*.*.price' => 'nullable|numeric|min:0',
         'price_matrix.*.*.discounted_price' => 'nullable|numeric|min:0',
+
+        // size chart
+        'size_chart' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:4096',
+        'remove_size_chart' => 'nullable|boolean',
     ];
 
     $messages = [
-        // basics
         'name.required' => 'Please enter a product name.',
         'price.required' => 'Please enter a price.',
         'price.numeric' => 'Price must be a number.',
@@ -398,17 +410,14 @@ public function update(Request $request, Product $product)
         'sku.required' => 'Please enter a SKU.',
         'sku.unique' => 'This SKU is already in use.',
 
-        // stock
         'stock_quantity.required_without' => 'Enter a “Stock quantity” or fill the stock matrix below.',
         'stock_quantity.integer' => 'Stock quantity must be a whole number.',
         'stock_quantity.min' => 'Stock quantity cannot be negative.',
 
-        // relationships
         'category_id.required' => 'Please choose a category.',
         'category_id.exists' => 'The selected category is not valid.',
         'collection_id.exists' => 'The selected collection is not valid.',
 
-        // sizes/colors
         'sizes.array' => 'Sizes must be sent as a list.',
         'sizes.*.string' => 'Each size must be text.',
         'colors.array' => 'Colors must be sent as a list.',
@@ -417,28 +426,28 @@ public function update(Request $request, Product $product)
         'colors.*.color_code.regex' => 'Use a valid hex color like #FFCC00.',
         'colors.*.hex.regex' => 'Use a valid hex color like #FFCC00.',
 
-        // images
         'images.array' => 'Please select one or more images.',
         'images.*.image' => 'Each file must be an image (jpg, jpeg, png, gif, webp, avif).',
         'images.*.max' => 'Each image must be 4 MB or smaller.',
         'images.*.uploaded' => 'We couldn’t upload this image. Try a smaller file, or a different format.',
 
-        // image color hexes
         'image_existing.*.color_code.regex' => 'Image color must be a valid hex like #A1B2C3.',
         'image_color_hexes.*.regex' => 'Image color must be a valid hex like #A1B2C3.',
 
-        // matrix
         'stock_matrix.array' => 'The stock matrix must be a grid of numbers.',
         'stock_matrix.*.array' => 'Each row in the stock matrix must be a list of numbers.',
         'stock_matrix.*.*.integer' => 'Stock quantities in the matrix must be whole numbers.',
         'stock_matrix.*.*.min' => 'Stock quantities in the matrix cannot be negative.',
 
-        // ✅ NEW price matrix messages
         'price_matrix.array' => 'The price matrix must be a grid.',
         'price_matrix.*.*.price.numeric' => 'Each option price must be a number.',
         'price_matrix.*.*.price.min' => 'Option price cannot be negative.',
         'price_matrix.*.*.discounted_price.numeric' => 'Each option discount must be a number.',
         'price_matrix.*.*.discounted_price.min' => 'Option discount cannot be negative.',
+
+        'size_chart.image' => 'The size chart must be an image.',
+        'size_chart.mimes' => 'The size chart must be a JPG, JPEG, PNG, or WEBP image.',
+        'size_chart.max' => 'The size chart must be 4 MB or smaller.',
     ];
 
     $attributes = [
@@ -464,10 +473,12 @@ public function update(Request $request, Product $product)
         'stock_matrix' => 'stock matrix',
         'stock_matrix.*.*' => 'stock quantity',
 
-        // ✅ NEW
         'price_matrix' => 'price matrix',
         'price_matrix.*.*.price' => 'option price',
         'price_matrix.*.*.discounted_price' => 'option discounted price',
+
+        'size_chart' => 'size chart',
+        'remove_size_chart' => 'remove size chart',
     ];
 
     $validated = $request->validate($rules, $messages, $attributes);
@@ -476,6 +487,7 @@ public function update(Request $request, Product $product)
 
         /* -------- 1) Core product fields -------- */
         $slugInput = $validated['slug'] ?? $validated['name'];
+
         $product->update([
             'name' => $validated['name'],
             'slug' => Str::slug($slugInput),
@@ -490,12 +502,37 @@ public function update(Request $request, Product $product)
             'collection_id' => $validated['collection_id'] ?? null,
         ]);
 
+        /* -------- 1.5) Size chart -------- */
+        if ($request->boolean('remove_size_chart')) {
+            if ($product->size_chart && \Storage::disk('public')->exists($product->size_chart)) {
+                \Storage::disk('public')->delete($product->size_chart);
+            }
+
+            $product->size_chart = null;
+            $product->save();
+        }
+
+        if ($request->hasFile('size_chart')) {
+            if ($product->size_chart && \Storage::disk('public')->exists($product->size_chart)) {
+                \Storage::disk('public')->delete($product->size_chart);
+            }
+
+            $product->size_chart = $request->file('size_chart')->store('products/size-charts', 'public');
+            $product->save();
+        }
+
         /* -------- 2) Replace Sizes (keeping input order -> index map) -------- */
         $product->sizes()->delete();
         $sizeIdByIndex = [];
+
         foreach ((array) $request->input('sizes', []) as $idx => $sizeName) {
             $sizeName = trim((string) $sizeName);
-            if ($sizeName === '') { $sizeIdByIndex[$idx] = null; continue; }
+
+            if ($sizeName === '') {
+                $sizeIdByIndex[$idx] = null;
+                continue;
+            }
+
             $size = $product->sizes()->create(['size' => $sizeName]);
             $sizeIdByIndex[$idx] = $size->id;
         }
@@ -503,17 +540,22 @@ public function update(Request $request, Product $product)
         /* -------- 3) Replace Colors (keeping input order -> index map) -------- */
         $product->colors()->delete();
         $colorIdByIndex = [];
+
         foreach ((array) $request->input('colors', []) as $idx => $c) {
             $name = isset($c['name']) ? trim((string) $c['name']) : null;
             $code = $c['color_code'] ?? $c['hex'] ?? null;
             $code = $code ? strtoupper($code) : null;
 
-            if (!$name || !$code) { $colorIdByIndex[$idx] = null; continue; }
+            if (!$name || !$code) {
+                $colorIdByIndex[$idx] = null;
+                continue;
+            }
 
             $row = $product->colors()->create([
                 'name' => $name,
                 'color_code' => $code,
             ]);
+
             $colorIdByIndex[$idx] = $row->id;
         }
 
@@ -530,7 +572,7 @@ public function update(Request $request, Product $product)
         $files = (array) $request->file('images', []);
         $newColorHexes = (array) $request->input('image_color_hexes', []);
         $newUids = (array) $request->input('new_image_uids', []);
-        $createdNewByUid = []; // uid => image id
+        $createdNewByUid = [];
 
         foreach ($files as $i => $file) {
             if (!$file) continue;
@@ -547,7 +589,9 @@ public function update(Request $request, Product $product)
             ]);
 
             $uid = $newUids[$i] ?? null;
-            if ($uid) $createdNewByUid[$uid] = $imgModel->id;
+            if ($uid) {
+                $createdNewByUid[$uid] = $imgModel->id;
+            }
         }
 
         $thumbExistingId = $request->input('thumbnail_existing_id');
@@ -558,16 +602,25 @@ public function update(Request $request, Product $product)
 
             if ($thumbExistingId) {
                 $img = $product->images()->where('id', (int) $thumbExistingId)->first();
-                if ($img) { $img->thumbnail = 1; $img->save(); }
+                if ($img) {
+                    $img->thumbnail = 1;
+                    $img->save();
+                }
             } elseif ($thumbNewUid && isset($createdNewByUid[$thumbNewUid])) {
                 $imgId = $createdNewByUid[$thumbNewUid];
                 $img = $product->images()->where('id', $imgId)->first();
-                if ($img) { $img->thumbnail = 1; $img->save(); }
+                if ($img) {
+                    $img->thumbnail = 1;
+                    $img->save();
+                }
             }
         } else {
             if (!$product->images()->where('thumbnail', 1)->exists()) {
                 $first = $product->images()->first();
-                if ($first) { $first->thumbnail = 1; $first->save(); }
+                if ($first) {
+                    $first->thumbnail = 1;
+                    $first->save();
+                }
             }
         }
 
@@ -575,6 +628,7 @@ public function update(Request $request, Product $product)
         $matrix = (array) $request->input('stock_matrix', []);
         $hasMatrix = $request->has('stock_matrix');
         $totalFromMatrix = 0;
+
 
         foreach ($matrix as $ciKey => $row) {
             if (!is_array($row)) continue;
@@ -605,12 +659,8 @@ public function update(Request $request, Product $product)
             $product->update(['stock_quantity' => $totalFromMatrix]);
         }
 
-        /* -------- 6) ✅ Price matrix -> option prices table -------- */
-        // IMPORTANT: rename optionPrices() to your real relation
-        // Example relation: public function optionPrices(){ return $this->hasMany(ProductOptionPrice::class); }
-
+        /* -------- 6) Price matrix -------- */
         if (method_exists($product, 'prices')) {
-            // Replace all option prices (because colors/sizes were replaced)
             $product->prices()->delete();
 
             $pm = (array) $request->input('price_matrix', []);
@@ -634,7 +684,6 @@ public function update(Request $request, Product $product)
                         $price = $cell['price'] ?? null;
                         $disc  = $cell['discounted_price'] ?? null;
 
-                        // Store only if at least one value is provided.
                         $hasAny = ($price !== null && $price !== '') || ($disc !== null && $disc !== '');
                         if (!$hasAny) continue;
 
@@ -649,7 +698,6 @@ public function update(Request $request, Product $product)
                 }
             }
         }
-
     });
 
     return redirect()

@@ -20,7 +20,8 @@ class Product extends Model
         'stock_quantity',
         'status',
         'category_id',
-        'collection_id'
+        'collection_id',
+        'size_chart',
 
     ];
 

@@ -15,13 +15,13 @@
         Page notes (kept ONLY here at the top):
         - Manual carousel only: no auto-advance timer, no start()/stop() interval logic.
         - Variant-aware pricing:
-                                                                  * If a prices-row exists for a variant: use that row price/discount (discounted_price > 0), ignore base discount.
-                                                                  * If no prices-row: fall back to base price + base discount (discount_price > 0).
-                                                                  * When selection is incomplete, show a range computed from in-stock variants (effective prices).
+                                                                                  * If a prices-row exists for a variant: use that row price/discount (discounted_price > 0), ignore base discount.
+                                                                                  * If no prices-row: fall back to base price + base discount (discount_price > 0).
+                                                                                  * When selection is incomplete, show a range computed from in-stock variants (effective prices).
         - Images:
-                                                                  * Filter by selected color if present, and keep thumbnails first if flagged.
+                                                                                  * Filter by selected color if present, and keep thumbnails first if flagged.
         - Stock:
-                                                                  * Availability and max quantity are based on variant stock rows.
+                                                                                  * Availability and max quantity are based on variant stock rows.
         */
 
         $colorHexById = $product->colors->pluck('color_code', 'id')->map(fn($v) => strtoupper($v));
@@ -237,9 +237,18 @@
                                         <span class="text-sm" x-text="s.size"></span>
                                     </button>
                                 </template>
+                                @php
+                                    use Illuminate\Support\Facades\Storage;
+                                    // Fallbacks if nothing in DB
+                                    $defaultSizeChart = asset('images/size-chart.jpeg');
 
+                                    // Decide background image
+                                    $sizeChart = $product->size_chart
+                                            ? Storage::url($product->size_chart)
+                                            : $product;
+                                @endphp
                                 <button type="button"
-                                    @click="showModal = true; modalImage = '{{ asset('images/size-chart.jpeg') }}'"
+                                    @click="showModal = true; modalImage = '{{ $sizeChart }}'"
                                     class="px-4 py-1.5 rounded-full border-2 transition hover:border-black">
                                     <span class="text-sm">Size Chart</span>
                                 </button>

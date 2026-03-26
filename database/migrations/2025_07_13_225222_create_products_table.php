@@ -24,6 +24,7 @@ return new class extends Migration {
             $table->boolean('status');
             $table->foreignId('category_id')->constrained()->on('categories')->onDelete('cascade');
             $table->foreignId('collection_id')->constrained()->on('collections')->onDelete('cascade');
+            $table->string('size_chart');
             $table->timestamps();
 
         });
