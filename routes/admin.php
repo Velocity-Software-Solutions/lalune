@@ -45,6 +45,8 @@ Route::middleware(['auth', IsAdmin::class])->group(function () {
         ->name('general.index-hero.update');
     Route::delete('/general/index-hero', [GeneralSetupController::class, 'resetIndexHero'])
         ->name('general.index-hero.reset');
+    Route::delete('/general/size-chart', [GeneralSetupController::class, 'resetSizeChart'])
+        ->name('general.size-chart.reset');
     Route::prefix('newsletter')
         ->name('newsletter.')
         ->group(function () {

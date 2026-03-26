@@ -13,7 +13,7 @@ class GeneralSetupController extends Controller
     public function updateIndexHero(Request $request)
     {
         $request->validate([
-            'content'          => 'nullable|string',
+            'content' => 'nullable|string',
             'background_image' => 'nullable|image|max:8048',
         ]);
 
@@ -21,7 +21,7 @@ class GeneralSetupController extends Controller
         $setup = GeneralSetup::where('key', 'index_hero')->first();
 
         // 2) If none exists, create a new instance
-        if (! $setup) {
+        if (!$setup) {
             $setup = new GeneralSetup();
             $setup->key = 'index_hero';
         }
@@ -42,6 +42,15 @@ class GeneralSetupController extends Controller
             $path = $request->file('background_image')->store('general', 'public');
             $setup->background_image = $path;
         }
+        if ($request->hasFile('size_chart_image')) {
+            // delete old file from disk only
+            if (!empty($setup->size_chart)) {
+                Storage::disk('public')->delete($setup->size_chart);
+            }
+
+            $path = $request->file('size_chart_image')->store('general', 'public');
+            $setup->size_chart = $path;
+        }
 
         // 5) Save changes to the *same* row (or new one if it didn't exist)
         $setup->save();
@@ -61,5 +70,19 @@ class GeneralSetupController extends Controller
         }
 
         return back()->with('status', 'Hero reset to default.');
+    }
+
+        public function resetSizeChart()
+    {
+        $setup = GeneralSetup::where('key', 'index_hero')->first();
+
+        if ($setup) {
+            if (!empty($setup->size_chart)) {
+                Storage::disk('public')->delete($setup->size_chart);
+            }
+            $setup->delete(); // <- THIS is the only place we ever delete the row
+        }
+
+        return back()->with('status', 'Size Chart reset to default.');
     }
 }

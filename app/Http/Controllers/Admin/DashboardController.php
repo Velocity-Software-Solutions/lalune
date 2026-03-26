@@ -96,9 +96,9 @@ public function index()
         'abandoned_checkouts_7d'  => null, // stays client-side via localStorage
     ];
 
-    $indexHero = GeneralSetup::where('key', 'index_hero')->first();
+    $indexData = GeneralSetup::where('key', 'index_hero')->first();
 
 
-    return view('admin.dashboard', compact('kpis', 'ordersSeries', 'pendingOrders', 'insights','indexHero'));
+    return view('admin.dashboard', compact('kpis', 'ordersSeries', 'pendingOrders', 'insights','indexData'));
 }
 }

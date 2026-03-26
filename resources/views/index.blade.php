@@ -1,7 +1,8 @@
 @extends('layouts.app')
 
 @section('title', 'LaLune By NE | Premium Canadian Clothing Brand')
-@section('meta_description', 'Shop LaLune By NE—premium Canadian local clothing brand. Designed in Canada with love &
+@section('meta_description',
+    'Shop LaLune By NE—premium Canadian local clothing brand. Designed in Canada with love &
     care. Explore our latest collections and limited drops.')
 @section('canonical', url('/'))
 
@@ -18,10 +19,10 @@
         }
 
         /*h2 {
-                font-size: 1.875rem; */
+                    font-size: 1.875rem; */
         /* 30px */
         /* font-weight: 600;
-            } */
+                } */
 
         h3 {
             font-size: 1.5rem;
@@ -54,7 +55,7 @@
         $defaultBg = asset('images/index-hero.jpg');
 
         // Decide background image
-        $heroBg = $indexHero && $indexHero->background_image ? Storage::url($indexHero->background_image) : $defaultBg;
+        $heroBg = $indexData && $indexData->background_image ? Storage::url($indexData->background_image) : $defaultBg;
     @endphp
 
     <div class="h-[30vh] md:h-[60vh] mx-6 rounded-3xl 
@@ -74,9 +75,9 @@
                     <span style="font-family:'Dancing Script', cursive;">love &amp; care</span>
                 </h3>
             </div>
-            @if ($indexHero && $indexHero->content)
+            @if ($indexData && $indexData->content)
                 {{-- Content from editor --}}
-                {!! $indexHero->content !!}
+                {!! $indexData->content !!}
             @else
                 <!-- Promo Codes Section -->
                 <div class="space-y-2 text-white/85 text-xs md:text-base montserrat-regular self-center">
@@ -185,7 +186,17 @@
 
         <!-- Fixed Filter button (bottom-right) -->
         <div class="flex justify-evenly gap-4 fixed bottom-4 right-4 z-40">
-            <button @click="showModal = true; modalImage = '{{ asset('images/size-chart.jpeg') }}'"
+            @php
+                // Fallbacks if nothing in DB
+                $defaultSizeChart = asset('images/size-chart.jpeg');
+
+                // Decide background image
+                $sizeChart =
+                    $indexData && $indexData->size_chart
+                        ? Storage::url($indexData->size_chart)
+                        : $defaultSizeChart;
+            @endphp
+            <button @click="showModal = true; modalImage = '{{ $sizeChart }}'"
                 class="px-5 py-3 rounded-full shadow-lg
                  bg-gradient-to-r from-black via-neutral-700 to-black
                  text-white font-medium

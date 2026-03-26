@@ -10,5 +10,6 @@ class GeneralSetup extends Model
         'key',
         'content',
         'background_image',
+        'size_chart',
     ];
 }

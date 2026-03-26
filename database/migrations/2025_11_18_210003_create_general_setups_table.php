@@ -4,8 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
-{
+return new class extends Migration {
     public function up(): void
     {
         Schema::create('general_setups', function (Blueprint $table) {
@@ -19,6 +18,8 @@ return new class extends Migration
 
             // Optional background image path (public disk)
             $table->string('background_image')->nullable();
+
+            $table->string('size_chart')->nullable();
 
             $table->timestamps();
         });

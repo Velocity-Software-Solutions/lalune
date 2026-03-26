@@ -31,11 +31,11 @@ class StoreController extends Controller
                 // Otherwise fall back to default name
                 return $p->category->name ?? 'Uncategorized';
             });
-                $indexHero = GeneralSetup::where('key', 'index_hero')->first();
+                $indexData = GeneralSetup::where('key', 'index_hero')->first();
 
 
             
-        return view('index', compact('products','indexHero'));
+        return view('index', compact('products','indexData'));
     }
 
     public function show($id)
