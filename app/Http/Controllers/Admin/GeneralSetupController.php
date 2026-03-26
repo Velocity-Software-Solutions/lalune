@@ -67,6 +67,7 @@ class GeneralSetupController extends Controller
                 Storage::disk('public')->delete($setup->background_image);
             }
             $setup->background_image = null;
+            $setup->content = null;
             $setup->update();
         }
 
