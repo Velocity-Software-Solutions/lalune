@@ -66,13 +66,14 @@ class GeneralSetupController extends Controller
             if (!empty($setup->background_image)) {
                 Storage::disk('public')->delete($setup->background_image);
             }
-            $setup->delete(); // <- THIS is the only place we ever delete the row
+            $setup->background_image == null;
+            $setup->update();
         }
 
         return back()->with('status', 'Hero reset to default.');
     }
 
-        public function resetSizeChart()
+    public function resetSizeChart()
     {
         $setup = GeneralSetup::where('key', 'index_hero')->first();
 
@@ -80,7 +81,8 @@ class GeneralSetupController extends Controller
             if (!empty($setup->size_chart)) {
                 Storage::disk('public')->delete($setup->size_chart);
             }
-            $setup->delete(); // <- THIS is the only place we ever delete the row
+            $setup->size_chart == null;
+            $setup->update();
         }
 
         return back()->with('status', 'Size Chart reset to default.');
