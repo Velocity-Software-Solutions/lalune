@@ -141,6 +141,43 @@
 | - price matrix (NEW)
 | - existing images + new images + thumbnail selection
 ============================================================================ --}}
+   <style>
+        h1 {
+            font-size: 2.25rem;
+            /* 36px */
+            font-weight: 700;
+        }
+
+        /*h2 {
+                    font-size: 1.875rem; */
+        /* 30px */
+        /* font-weight: 600;
+                } */
+
+        h3 {
+            font-size: 1.5rem;
+            /* 24px */
+            font-weight: 600;
+        }
+
+        h4 {
+            font-size: 1.25rem;
+            /* 20px */
+            font-weight: 500;
+        }
+
+        h5 {
+            font-size: 1rem;
+            /* 16px */
+            font-weight: 500;
+        }
+
+        h6 {
+            font-size: 0.875rem;
+            /* 14px */
+            font-weight: 500;
+        }
+    </style>
     <script>
         window.productEditor = function(init) {
             init = init || {};
@@ -592,12 +629,9 @@
             </div>
 
             {{-- Description --}}
-                        @php
-            $clean = strip_tags($product->description, '<p><br><strong><b><em><i><ul><ol><li><h1><h2><h3><h4><h5><h6><blockquote><a><img>');
-            @endphp
             <div>
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Description</label>
-                <textarea class="summernote-editor" name="description">{!! old('description', $clean) !!}</textarea>
+                <textarea class="summernote-editor" name="description">{!! old('description', $product->description) !!}</textarea>
                 @error('description')
                     <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
                 @enderror

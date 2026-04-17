@@ -391,7 +391,43 @@ $bootPrice = old('price_matrix', []);
             };
         }
     </script>
+   <style>
+        h1 {
+            font-size: 2.25rem;
+            /* 36px */
+            font-weight: 700;
+        }
 
+        /*h2 {
+                    font-size: 1.875rem; */
+        /* 30px */
+        /* font-weight: 600;
+                } */
+
+        h3 {
+            font-size: 1.5rem;
+            /* 24px */
+            font-weight: 600;
+        }
+
+        h4 {
+            font-size: 1.25rem;
+            /* 20px */
+            font-weight: 500;
+        }
+
+        h5 {
+            font-size: 1rem;
+            /* 16px */
+            font-weight: 500;
+        }
+
+        h6 {
+            font-size: 0.875rem;
+            /* 14px */
+            font-weight: 500;
+        }
+    </style>
     <div
         class="mx-2 bg-white dark:bg-gray-800 p-6 shadow-md rounded-tl-md rounded-tr-md overflow-scroll custom-scrollbar scrollbar-hide">
         <h2 class="text-2xl font-semibold text-gray-800 dark:text-white mb-6 flex items-center">
