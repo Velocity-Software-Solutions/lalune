@@ -592,9 +592,12 @@
             </div>
 
             {{-- Description --}}
+                        @php
+            $clean = strip_tags($product->description, '<p><br><strong><b><em><i><ul><ol><li><h1><h2><h3><h4><h5><h6><blockquote><a><img>');
+            @endphp
             <div>
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Description</label>
-                <textarea class="summernote-editor" name="description">{!! old('description', $product->description) !!}</textarea>
+                <textarea class="summernote-editor" name="description">{!! old('description', $clean) !!}</textarea>
                 @error('description')
                     <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
                 @enderror
